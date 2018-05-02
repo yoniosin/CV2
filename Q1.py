@@ -23,7 +23,7 @@ def reconstructPyramid(pyramid_levels):
         result += pyramid_levels[i]
 
     normal = np.empty(pyramid_levels[0].shape)
-    cv.normalize(result, normal, 0, 255, norm_type=cv.NO)
+    cv.normalize(result, normal, 0, 255, norm_type=cv.NORM_MINMAX)
     return normal
 
 
