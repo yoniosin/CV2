@@ -22,9 +22,6 @@ def reconstructPyramid(pyramid_levels):
     for i in range(len(pyramid_levels)):
         result += pyramid_levels[i]
 
-    # normal = np.zeros(pyramid_levels[0].shape)
-    # cv.normalize(result, normal, 0, 255, norm_type=cv.NORM_MINMAX)
-    # return normal.astype(np.uint)
     return result.astype(np.uint)
 
 
@@ -34,7 +31,7 @@ if __name__ == '__main__':
     n = 5
     L = getPyramid(cv.imread('noy.jpg')[...,::-1], n)
     for i in range(n):
-        plt.imshow(L[i])
+        plt.imshow(L[i].astype(np.uint))
         plt.show()
 
     plt.imshow(reconstructPyramid(L))
