@@ -17,8 +17,5 @@ if __name__ == '__main__':
 
     plt.show()
 
-    # n = 6
-    # input_pyr = getLaplasPyramid(in_img_new_bg, n)
-    # example_pyr = getLaplasPyramid(ex_img, n)
-    #
-    #
+    n = 6
+    input_pyr = calcEnergy(in_img_new_bg)

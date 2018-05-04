@@ -1,4 +1,4 @@
-import matplotlib.plt as plt
+import matplotlib.pyplot as plt
 from ImgFuncs import *
 
 if __name__ == '__main__':
