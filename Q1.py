@@ -4,23 +4,18 @@ import numpy as np
 
 
 def getGaussPyramid(image, levels):
-    g = {}
+    gauss = {}
     for i in range(2, levels + 1):
-        g[i] = cv.GaussianBlur(image, (0, 0), 2 ** i).astype(int)
-    return g
+        gauss[i] = cv.GaussianBlur(image, (0, 0), 2 ** i).astype(int)
+    return gauss
 
 
 def getLaplasPyramid(image, levels):
     g = getGaussPyramid(image, levels)
 
-    laplas = {}
-    for i in range(1, levels + 1):
-        if i == 1:
-            laplas[i] = image.astype(int) - g[2]
-        elif i == levels:
-            laplas[i] = g[levels]
-        else:
-            laplas[i] = g[i] - g[i + 1]
+    laplas = {1: image.astype(int) - g[2], levels: g[levels]}
+    for i in range(2, levels):
+        laplas[i] = g[i] - g[i + 1]
 
     return laplas
 
