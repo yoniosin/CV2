@@ -22,22 +22,15 @@ def reconstructPyramid(pyramid_levels):
     for i in range(len(pyramid_levels)):
         result += pyramid_levels[i]
 
-    # normal = np.zeros(pyramid_levels[0].shape)
-    # cv.normalize(result, normal, 0, 255, norm_type=cv.NORM_MINMAX)
-    # return normal.astype(np.uint)
     return result.astype(np.int)
 
 
 if __name__ == '__main__':
-    plt.imshow(cv.imread('noy.jpg', 0), cmap='gray')
-    plt.show()
-    n = 3
-    L = getPyramid(cv.imread('noy.jpg', 0), n)
+    img = cv.imread('noy.jpg', 0)
+    n = 6
+    L = getPyramid(img, n)
     normal = np.zeros(L[0].shape)
-    for i in range(n):
-        cv.normalize(L[i], normal, 0, 255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
-        plt.imshow(normal, cmap='gray')
-        plt.show()
 
-    plt.imshow(reconstructPyramid(L), cmap='gray')
+    plt.subplot(1,2,1), plt.imshow(reconstructPyramid(L), cmap='gray')
+    plt.subplot(1,2,2), plt.imshow(img, cmap='gray')
     plt.show()
