@@ -7,17 +7,18 @@ if __name__ == '__main__':
 
     ex_img = cv.imread('data/Examples/imgs/6.png')[:, :, ::-1]/255
     ex_bg = cv.imread('data/Examples/bgs/6.jpg')[:, :, ::-1] / 255
+    plt.imshow(ex_bg)
 
     in_img_new_bg = changeBackgroud(in_img, in_img_msk, ex_bg)
 
     plt.subplot(1, 3, 1), plt.imshow(in_img), plt.title('Input Image')
     plt.subplot(1, 3, 2), plt.imshow(ex_img), plt.title('Example Image')
-    plt.subplot(1, 3, 3), plt.imshow(new_bg), plt.title('New Bg Image')
+    plt.subplot(1, 3, 3), plt.imshow(in_img_new_bg), plt.title('New Bg Image')
 
     plt.show()
 
-    n = 6
-    input_pyr = getLaplasPyramid(in_img_new_bg, n)
-    example_pyr = getLaplasPyramid(ex_img, n)
-
-
+    # n = 6
+    # input_pyr = getLaplasPyramid(in_img_new_bg, n)
+    # example_pyr = getLaplasPyramid(ex_img, n)
+    #
+    #
