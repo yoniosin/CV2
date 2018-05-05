@@ -3,7 +3,7 @@ from ImgFuncs import *
 
 if __name__ == '__main__':
     in_img = cv.imread('data/Inputs/imgs/0004_6.png')[:, :, ::-1]/255
-    in_img_msk = cv.imread('data/Inputs/masks/0004_6.png')[:, :, ::-1]/255
+    in_img_msk = cv.imread('data/Inputs/masks/0004_6.png')[:, :, ::-1] > 100
 
     ex_img = cv.imread('data/Examples/imgs/6.png')[:, :, ::-1]/255
     ex_bg = cv.imread('data/Examples/bgs/6.jpg')[:, :, ::-1] / 255
