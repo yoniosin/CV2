@@ -32,7 +32,7 @@ def getRBGLaplacianPyramid(image, levels):
 
 def reconstructImgFromPyramid(pyramid_levels):
     img_size = pyramid_levels[1].shape
-    result = np.zeros(img_size, dtype=int)
+    result = np.zeros(img_size) #, dtype=int
     for i in range(1, len(pyramid_levels) + 1):
         result += pyramid_levels[i]
 
@@ -73,7 +73,7 @@ def constructOutPyramid(gain, inRGBPyr, exRGBPyr, levels):
         for j in range(1, levels + 1):
             key = color + str(j)
             if j == levels:
-                outputPyr[color][j] = exRGBPyr[color][j].astype(np.uint8)
+                outputPyr[color][j] = exRGBPyr[color][j]#.astype(np.uint8)
             else:
-                outputPyr[color][j] = (gain[key] * inRGBPyr[color][j]).astype(np.uint8)
+                outputPyr[color][j] = (gain[key] * inRGBPyr[color][j])#.astype(np.uint8)
     return outputPyr

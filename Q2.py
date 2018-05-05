@@ -16,20 +16,23 @@ if __name__ == '__main__':
     plt.subplot(1, 3, 3), plt.imshow(in_img_new_bg), plt.title('New Bg Image')
 
     plt.show()
-
-    n = 6
+    print("All done :) 1")
+    n = 3
     inRGBPyr = getRBGLaplacianPyramid(in_img_new_bg, n)
     examplePyr = getRBGLaplacianPyramid(ex_img, n)
 
+    print("All done :) 2")
     input_energy_pyr = calcEnergy(inRGBPyr, n)
     ex_energy_pyr = calcEnergy(examplePyr, n)
 
+    print("All done :) 3")
     gain = calcGain(ex_energy_pyr, input_energy_pyr, 0.9, 2.8, n)
     outputPyr = constructOutPyramid(gain, inRGBPyr, examplePyr, n)
 
-    output = np.empty(in_img.shape, dtype= int)
-    for i, color in enumerate(['R', 'G', 'B']):
-        output[:, :, i] = reconstructImgFromPyramid(outputPyr[color])
+    print("All done :) 4")
+    output = np.empty(in_img.shape, dtype=int)
+    for i, color in enumerate(['G', 'B', 'R']):
+        output[:, :, i] = reconstructImgFromPyramid(outputPyr[color]).astype(np.uint8)
 
     plt.imshow(output)
     plt.show()
