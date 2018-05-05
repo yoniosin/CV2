@@ -16,14 +16,9 @@ def getGaussPyramid(image, levels):
 def getLaplasPyramid(image, levels):
     g = getGaussPyramid(image, levels)
 
-    L = {}
-    for i in range(1, levels + 1):
-        if i == 1:
-            L[i] = image.astype(int) - g[2]
-        elif i == levels:
-            L[i] = g[levels]
-        else:
-            L[i] = g[i] - g[i + 1]
+    L = {1: image.astype(int) - g[2], levels: g[levels]}
+    for i in range(2, levels):
+        L[i] = g[i] - g[i + 1]
 
     return L
 
