@@ -1,5 +1,8 @@
 import matplotlib.pyplot as plt
 from ImgFuncs import *
+import os
+import re
+from collections import namedtuple
 
 
 def styleChange(input_path, input_bg_path, example_path, example_bg_path):
@@ -35,23 +38,40 @@ def styleChange(input_path, input_bg_path, example_path, example_bg_path):
     plt.show()
 
 
+def parseInstructions(dictionary):
+    input_path = './data/Inputs/imgs/'
+    input_mask_path = './data/Inputs/masks/'
+
+    inputData = namedtuple('inputData', ['image_path', 'mask_path', 'styles'])
+    in_dict = {}
+    for file in os.listdir(input_path):
+        in_dict[file] = inputData(input_path + file, input_mask_path + file, dictionary[file])
+
+    example_path = './data/Examples/imgs/'
+    example_mask_path = './data/Examples/bgs/'
+
+    styleData = namedtuple('styleData', ['style_path', 'mask_path'])
+    ex_dict = {}
+    file_name_pattern = r'(.*).png'  # ignore extension, because masks are different
+    for file in os.listdir(example_path):
+        pure_name = re.match(file_name_pattern, file).group(1)  # extract only the file's name (before '.')
+        ex_dict[file] = styleData(example_path + file, example_mask_path + pure_name + '.jpg')
+
+    return in_dict, ex_dict
+
+
+def styleChangeWrapper(input_dict, example_dict):
+    # receive dictionaries containing all needed paths, and call styleChange for every requested combination
+    for image_key in input_dict:
+        image = input_dict[image_key]
+        for style_key in image.styles:
+            style = example_dict[style_key]
+            styleChange(image.image_path, image.mask_path, style.style_path, style.mask_path)
+
+
 if __name__ == '__main__':
-    input_name = ['0004_6.png', '0006_001.png']
-    input_image = ['./data/Inputs/imgs/' + s for s in input_name]
-    input_mask = ['./data/Inputs/masks/' + s for s in input_name]
+    instructions_dict = {'0004_6.png': ['16.png', '21.png'], '0006_001.png': ['0.png', '9.png', '10.png']}
+    inputs, examples = parseInstructions(instructions_dict)
+    styleChangeWrapper(inputs, examples)
 
-    example_dict = {0: ['16', '21'], 1: ['0', '9', '10']}
-    for i, _ in enumerate(input_name):
-        example_name = example_dict[i]
-        example_image = ['./data/Examples/imgs/' + s + '.png' for s in example_name]
-        example_bg = ['./data/Examples/bgs/' + s + '.jpg' for s in example_name]
-        for j, _ in enumerate(example_name):
-            styleChange(input_image[i], input_mask[i], example_image[j], example_bg[j])
-
-    in_img = cv.imread('data/Inputs/imgs/0004_6.png')[:, :, ::-1] / 255
-    in_img_msk = cv.imread('data/Inputs/masks/0004_6.png')[:, :, ::-1] > 100
-
-    ex_img = (cv.imread('data/Examples/imgs/6.png')[:, :, ::-1]) / 255
-    ex_bg = (cv.imread('data/Examples/bgs/6.jpg')[:, :, ::-1]) / 255
-    plt.imshow(ex_bg)
     print("All done :)")
