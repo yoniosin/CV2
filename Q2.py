@@ -18,4 +18,6 @@ if __name__ == '__main__':
     plt.show()
 
     n = 6
-    input_pyr = calcEnergy(in_img_new_bg)
+    input_energy_pyr = calcEnergy(in_img_new_bg, n)
+    ex_energy_pyr = calcEnergy(ex_img, n)
+    print("dsf")
