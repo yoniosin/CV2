@@ -25,8 +25,8 @@ def getLaplasPyramid(image, levels):
 
 def getRBGLaplacianPyramid(image, levels):
     RGBPyr = {}
-    for i in range(1, 4):
-        RGBPyr[i] = getLaplasPyramid(image[:, :, i-1], levels)
+    for i, color in enumerate(['R', 'G', 'B']):
+        RGBPyr[color] = getLaplasPyramid(image[:, :, i - 1], levels)
 
     return RGBPyr
 
@@ -41,19 +41,15 @@ def reconstructPyramid(pyramid_levels):
 
 
 def changeBackgroud(input_img, bg_mask, example_bg):
-
     return input_img * bg_mask + example_bg * np.logical_not(bg_mask)
 
 
-def calcEnergy(in_img):
+def calcEnergy(in_img, levels):
+    inPyr = getRBGLaplacianPyramid(in_img, levels)
+    energy_in = {}
 
-    n = 6
-    inPyr = getRBGLaplacianPyramid(in_img, n)
-    energy_in = []
-
-    for rbg_idx in range(1, 4):
-        for level_idx in range(1, n + 1):
-            energy_in.append(cv.GaussianBlur(inPyr[rbg_idx][level_idx] ** 2, (0, 0), level_idx))  # TODO level_idx+1?
-
-
-
+    for i in ['R', 'G', 'B']:
+        pyramid = inPyr[i]
+        for j in range(1, levels + 1):
+            key = i + str(j)
+            energy_in[key] = cv.GaussianBlur(pyramid[j] ** 2, (0, 0), 2 ** (j + 1))
