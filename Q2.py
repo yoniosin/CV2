@@ -5,12 +5,12 @@ import re
 from collections import namedtuple
 
 
-def styleChange(input_path, input_bg_path, example_path, example_bg_path):
-    in_img = cv.imread(input_path)[:, :, ::-1] / 255
-    in_img_msk = cv.imread(input_bg_path)[:, :, ::-1] > 100
+def styleChange(input_data, style_data):
+    in_img = cv.imread(input_data.image_path)[:, :, ::-1] / 255
+    in_img_msk = cv.imread(input_data.mask_path)[:, :, ::-1] > 100
 
-    ex_img = (cv.imread(example_path)[:, :, ::-1]) / 255
-    ex_bg = (cv.imread(example_bg_path)[:, :, ::-1]) / 255
+    ex_img = (cv.imread(style_data.style_path)[:, :, ::-1]) / 255
+    ex_bg = (cv.imread(style_data.mask_path)[:, :, ::-1]) / 255
     in_img_new_bg = changeBackgroud(in_img, in_img_msk, ex_bg)
 
     plt.subplot(1, 3, 1), plt.imshow(in_img), plt.title('Input Image')
@@ -19,7 +19,7 @@ def styleChange(input_path, input_bg_path, example_path, example_bg_path):
 
     plt.show()
 
-    n = 6
+    n = 10
     inRGBPyr = getRBGLaplacianPyramid(in_img_new_bg, n)
     examplePyr = getRBGLaplacianPyramid(ex_img, n)
 
@@ -32,7 +32,6 @@ def styleChange(input_path, input_bg_path, example_path, example_bg_path):
     output = np.empty(in_img.shape, dtype=np.uint8)
     for k, color in enumerate(['R', 'G', 'B']):
         output[:, :, k] = reconstructImgFromPyramid(outputPyr[color])
-    plt.show()
 
     plt.imshow(output)
     plt.show()
@@ -66,7 +65,7 @@ def styleChangeWrapper(input_dict, example_dict):
         image = input_dict[image_key]
         for style_key in image.styles:
             style = example_dict[style_key]
-            styleChange(image.image_path, image.mask_path, style.style_path, style.mask_path)
+            styleChange(image, style)
 
 
 if __name__ == '__main__':
