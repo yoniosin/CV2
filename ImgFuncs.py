@@ -3,20 +3,20 @@ import numpy as np
 
 
 def normalize(image):
-    return (255 * (image - image.min()) / (image.max() - image.min())).astype(np.uint)
+    return (255 * (image - image.min()) / (image.max() - image.min())).astype(np.uint8)
 
 
 def getGaussPyramid(image, levels):
     g = {}
     for i in range(2, levels + 1):
-        g[i] = cv.GaussianBlur(image, (0, 0), 2 ** i).astype(int)
+        g[i] = cv.GaussianBlur(image, (0, 0), 2 ** i).astype(float)
     return g
 
 
 def getLaplasPyramid(image, levels):
     g = getGaussPyramid(image, levels)
 
-    L = {1: image.astype(int) - g[2], levels: g[levels]}
+    L = {1: image.astype(float) - g[2], levels: g[levels]}
     for i in range(2, levels):
         L[i] = g[i] - g[i + 1]
     return L
@@ -25,18 +25,19 @@ def getLaplasPyramid(image, levels):
 def getRBGLaplacianPyramid(image, levels):
     RGBPyr = {}
     for i, color in enumerate(['R', 'G', 'B']):
-        RGBPyr[color] = getLaplasPyramid(image[:, :, i - 1], levels)
+        RGBPyr[color] = getLaplasPyramid(image[:, :, i], levels)
 
     return RGBPyr
 
 
 def reconstructImgFromPyramid(pyramid_levels):
     img_size = pyramid_levels[1].shape
-    result = np.zeros(img_size) #, dtype=int
+    result = np.zeros(img_size)
     for i in range(1, len(pyramid_levels) + 1):
         result += pyramid_levels[i]
 
-    return result.astype(int)
+    result = 255 * np.clip(result, 0, 1)
+    return result.astype(np.uint8)
 
 
 def changeBackgroud(input_img, bg_mask, example_bg):
@@ -50,8 +51,7 @@ def calcEnergy(RGBPyr, levels):
         pyramid = RGBPyr[color]
         for j in range(1, levels + 1):
             key = color + str(j)
-            curr_pyr = pyramid[j] ** 2
-            energy_in[key] = cv.GaussianBlur(curr_pyr.astype(np.uint8), (0, 0), 2 ** (j + 1))
+            energy_in[key] = cv.GaussianBlur(pyramid[j] ** 2, (0, 0), 2 ** (j + 1))
 
     return energy_in
 
@@ -73,7 +73,7 @@ def constructOutPyramid(gain, inRGBPyr, exRGBPyr, levels):
         for j in range(1, levels + 1):
             key = color + str(j)
             if j == levels:
-                outputPyr[color][j] = exRGBPyr[color][j]#.astype(np.uint8)
+                outputPyr[color][j] = exRGBPyr[color][j]
             else:
-                outputPyr[color][j] = (gain[key] * inRGBPyr[color][j])#.astype(np.uint8)
+                outputPyr[color][j] = (gain[key] * inRGBPyr[color][j])
     return outputPyr
