@@ -10,6 +10,6 @@ if __name__ == '__main__':
         plt.imshow(normalize(L[i]), cmap='gray')
         plt.show()
 
-    plt.subplot(1, 2, 1), plt.imshow(reconstructPyramid(L), cmap='gray'), plt.title('Reconstructed')
+    plt.subplot(1, 2, 1), plt.imshow(reconstructImgFromPyramid(L), cmap='gray'), plt.title('Reconstructed')
     plt.subplot(1, 2, 2), plt.imshow(img, cmap='gray'), plt.title('Original')
     plt.show()
