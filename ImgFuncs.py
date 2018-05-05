@@ -19,7 +19,6 @@ def getLaplasPyramid(image, levels):
     L = {1: image.astype(int) - g[2], levels: g[levels]}
     for i in range(2, levels):
         L[i] = g[i] - g[i + 1]
-
     return L
 
 
@@ -31,7 +30,7 @@ def getRBGLaplacianPyramid(image, levels):
     return RGBPyr
 
 
-def reconstructPyramid(pyramid_levels):
+def reconstructImgFromPyramid(pyramid_levels):
     img_size = pyramid_levels[1].shape
     result = np.zeros(img_size, dtype=int)
     for i in range(1, len(pyramid_levels) + 1):
@@ -44,12 +43,37 @@ def changeBackgroud(input_img, bg_mask, example_bg):
     return input_img * bg_mask + example_bg * np.logical_not(bg_mask)
 
 
-def calcEnergy(in_img, levels):
-    inPyr = getRBGLaplacianPyramid(in_img, levels)
+def calcEnergy(RGBPyr, levels):
     energy_in = {}
 
-    for i in ['R', 'G', 'B']:
-        pyramid = inPyr[i]
+    for color in ['R', 'G', 'B']:
+        pyramid = RGBPyr[color]
         for j in range(1, levels + 1):
-            key = i + str(j)
-            energy_in[key] = cv.GaussianBlur(pyramid[j] ** 2, (0, 0), 2 ** (j + 1))
+            key = color + str(j)
+            curr_pyr = pyramid[j] ** 2
+            energy_in[key] = cv.GaussianBlur(curr_pyr.astype(np.uint8), (0, 0), 2 ** (j + 1))
+
+    return energy_in
+
+
+def calcGain(ex_energy, in_energy, min_val, max_val, levels):
+    gain = {}
+    eps = 10 ** -4
+    for color in ['R', 'G', 'B']:
+        for j in range(1, levels + 1):
+            key = color + str(j)
+            gain[key] = np.clip(np.sqrt(ex_energy[key] / (in_energy[key] + eps)), min_val, max_val)
+
+    return gain
+
+
+def constructOutPyramid(gain, inRGBPyr, exRGBPyr, levels):
+    outputPyr = {'R': {}, 'G': {}, 'B': {}}
+    for color in ['R', 'G', 'B']:
+        for j in range(1, levels + 1):
+            key = color + str(j)
+            if j == levels:
+                outputPyr[color][j] = exRGBPyr[color][j].astype(np.uint8)
+            else:
+                outputPyr[color][j] = (gain[key] * inRGBPyr[color][j]).astype(np.uint8)
+    return outputPyr
