@@ -19,7 +19,7 @@ def styleChange(input_data, style_data):
 
     plt.show()
 
-    n = 10
+    n = 6
     inRGBPyr = getRBGLaplacianPyramid(in_img_new_bg, n)
     examplePyr = getRBGLaplacianPyramid(ex_img, n)
 
