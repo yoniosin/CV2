@@ -17,7 +17,7 @@ def styleChange(input_data, style_data):
     plt.subplot(1, 3, 2), plt.imshow(ex_img), plt.title('Example Image')
     plt.subplot(1, 3, 3), plt.imshow(in_img_new_bg), plt.title('New Bg Image')
 
-    plt.show()
+    # plt.show()
 
     n = 6
     inRGBPyr = getRBGLaplacianPyramid(in_img_new_bg, n)
@@ -33,28 +33,37 @@ def styleChange(input_data, style_data):
     for k, color in enumerate(['R', 'G', 'B']):
         output[:, :, k] = reconstructImgFromPyramid(outputPyr[color])
 
-    plt.imshow(output)
+    plt.subplot(1, 3, 1), plt.imshow(in_img), plt.title('Input Image')
+    plt.subplot(1, 3, 2), plt.imshow(ex_img), plt.title('Example Image')
+    plt.subplot(1, 3, 3), plt.imshow(output), plt.title('Image After Style Change')
+    title = 'Transition from ' + input_data.name + ' to ' + style_data.name
+    plt.suptitle(title)
+
     plt.show()
+    plt.imsave(title, output)
 
 
 def parseInstructions(dictionary):
     input_path = './data/Inputs/imgs/'
     input_mask_path = './data/Inputs/masks/'
+    inputData = namedtuple('inputData', ['name', 'image_path', 'mask_path', 'styles'])
 
-    inputData = namedtuple('inputData', ['image_path', 'mask_path', 'styles'])
+    file_name_pattern = r'(.*).(png|jpg)'  # ignore extension, because masks are different
+
     in_dict = {}
     for file in os.listdir(input_path):
-        in_dict[file] = inputData(input_path + file, input_mask_path + file, dictionary[file])
+        pure_name = re.match(file_name_pattern, file).group(1)  # extract only the file's name (before '.')
+        in_dict[file] = inputData(pure_name, input_path + file, input_mask_path + file, dictionary[file])
 
     example_path = './data/Examples/imgs/'
     example_mask_path = './data/Examples/bgs/'
 
-    styleData = namedtuple('styleData', ['style_path', 'mask_path'])
+    styleData = namedtuple('styleData', ['name', 'style_path', 'mask_path'])
     ex_dict = {}
-    file_name_pattern = r'(.*).png'  # ignore extension, because masks are different
+
     for file in os.listdir(example_path):
         pure_name = re.match(file_name_pattern, file).group(1)  # extract only the file's name (before '.')
-        ex_dict[file] = styleData(example_path + file, example_mask_path + pure_name + '.jpg')
+        ex_dict[file] = styleData(pure_name, example_path + file, example_mask_path + pure_name + '.jpg')
 
     return in_dict, ex_dict
 
