@@ -6,6 +6,7 @@ def normalize(image):
     return (255 * (image - image.min()) / (image.max() - image.min())).astype(np.uint8)
 
 
+# //////////////////////////////// Q1 Funcs ////////////////////////
 def getGaussPyramid(image, levels):
     g = {}
     for i in range(2, levels + 1):
@@ -22,14 +23,6 @@ def getLaplasPyramid(image, levels):
     return L
 
 
-def getRBGLaplacianPyramid(image, levels):
-    RGBPyr = {}
-    for i, color in enumerate(['R', 'G', 'B']):
-        RGBPyr[color] = getLaplasPyramid(image[:, :, i], levels)
-
-    return RGBPyr
-
-
 def reconstructImgFromPyramid(pyramid_levels):
     img_size = pyramid_levels[1].shape
     result = np.zeros(img_size)
@@ -38,6 +31,15 @@ def reconstructImgFromPyramid(pyramid_levels):
 
     result = 255 * np.clip(result, 0, 1)
     return result.astype(np.uint8)
+
+
+# ////////////////////////////// Q2 Funcs ////////////////////
+def getRBGLaplacianPyramid(image, levels):
+    RGBPyr = {}
+    for i, color in enumerate(['R', 'G', 'B']):
+        RGBPyr[color] = getLaplasPyramid(image[:, :, i], levels)
+
+    return RGBPyr
 
 
 def changeBackgroud(input_img, bg_mask, example_bg):
