@@ -11,9 +11,9 @@ if __name__ == '__main__':
         plt.imshow(normalize(L[i]), cmap='gray')
         plt.show()
 
-    recon = reconstructImgFromPyramid(L)
+    recon = reconstructImgFromPyramid(L) / 255
     diffImg = img - recon
     plt.subplot(1, 3, 1), plt.imshow(recon, cmap='gray'), plt.title('Reconstructed')
     plt.subplot(1, 3, 2), plt.imshow(img, cmap='gray'), plt.title('Original')
-    plt.subplot(1, 3, 2), plt.imshow(diffImg, cmap='gray'), plt.title('Difference ' + str(np.linalg.norm(diffImg)))
+    plt.subplot(1, 3, 3), plt.imshow(diffImg, cmap='gray'), plt.title('Difference ' + "%.2f" % np.linalg.norm(diffImg))
     plt.show()

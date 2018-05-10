@@ -39,6 +39,7 @@ def styleChange(input_data, style_data):
     title = 'Transition from ' + input_data.name + ' to ' + style_data.name
     plt.suptitle(title)
 
+    plt.savefig(title + '_fig')
     plt.show()
     plt.imsave(title, output)
 
@@ -48,7 +49,7 @@ def parseInstructions(dictionary):
     input_mask_path = './data/Inputs/masks/'
     inputData = namedtuple('inputData', ['name', 'image_path', 'mask_path', 'styles'])
 
-    file_name_pattern = r'(.*).(png|jpg)'  # ignore extension, because masks are different
+    file_name_pattern = r'(.*)\.'  # extract name + extension
 
     in_dict = {}
     for file in os.listdir(input_path):
