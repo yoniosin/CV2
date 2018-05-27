@@ -7,18 +7,18 @@ from collections import namedtuple
 
 def styleChange(input_data, style_data):
     in_img = cv.imread(input_data.image_path)[:, :, ::-1] / 255
-    in_img_msk = cv.imread(input_data.mask_path)[:, :, ::-1]
+    in_img_msk = cv.imread(input_data.mask_path)[:, :, ::-1] / 255
 
     ex_img = (cv.imread(style_data.style_path)[:, :, ::-1]) / 255
     ex_bg = (cv.imread(style_data.mask_path)[:, :, ::-1]) / 255
     in_img_new_bg = changeBackgroud(in_img, in_img_msk, ex_bg)
 
-    plt.subplot(1, 3, 1), plt.imshow(in_img), plt.title('Input Image')
-    plt.subplot(1, 3, 2), plt.imshow(ex_img), plt.title('Example Image')
-    plt.subplot(1, 3, 3), plt.imshow(in_img_new_bg), plt.title('New Bg Image')
+    # plt.subplot(1, 3, 1), plt.imshow(in_img), plt.title('Input Image')
+    # plt.subplot(1, 3, 2), plt.imshow(ex_img), plt.title('Example Image')
+    # plt.subplot(1, 3, 3), plt.imshow(in_img_new_bg), plt.title('New Bg Image')
 
     plt.show()
-'''
+
     n = 6
     inRGBPyr = getRBGLaplacianPyramid(in_img_new_bg, n)
     examplePyr = getRBGLaplacianPyramid(ex_img, n)
@@ -42,7 +42,6 @@ def styleChange(input_data, style_data):
     plt.savefig(title + '_fig')
     plt.show()
     plt.imsave(title, output)
-'''
 
 
 def parseInstructions(dictionary):

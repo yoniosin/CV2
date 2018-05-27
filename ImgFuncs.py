@@ -43,7 +43,7 @@ def getRBGLaplacianPyramid(image, levels):
 
 
 def changeBackgroud(input_img, bg_mask, example_bg):
-    return input_img * bg_mask + example_bg * np.logical_not(bg_mask)
+    return input_img * bg_mask + example_bg * (1 - bg_mask)
 
 
 def calcEnergy(RGBPyr, levels):
