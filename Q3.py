@@ -37,7 +37,7 @@ def makeVideoMask(extract_imgs_path):
         cv.imwrite("masks/mask%03d.jpg" % i, mask)  # save frame as JPEG file
 
 
-def createVideo(image_folder, mask_folder, video_name):
+def createVideo(image_folder, mask_folder, video_name, fps):
 
     images = os.listdir(image_folder)
     masks = os.listdir(mask_folder)
@@ -46,7 +46,7 @@ def createVideo(image_folder, mask_folder, video_name):
     height, width, layers = frame.shape
 
     fourcc = cv.VideoWriter_fourcc(*'XVID')
-    video = cv.VideoWriter(video_name, fourcc, 30, (width, height))
+    video = cv.VideoWriter(video_name, fourcc, fps, (width, height))
 
     for i, (image, mask) in enumerate(zip(images, masks)):
         curr_im = cv.imread(image_folder + '/' + image)
@@ -63,6 +63,6 @@ if __name__ == '__main__':
     video_path = 'chair.mp4'
     extractImages(video_path)
     makeVideoMask('extractedImgs')
-    createVideo('extractedImgs', 'masks', 'videoSeg.avi')
+    createVideo('extractedImgs', 'masks', 'videoSeg.avi', 30)
 
     print('all dona')
