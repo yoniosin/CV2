@@ -80,14 +80,16 @@ def cornerDetector(img):
     # Now draw them
     res = np.hstack((centroids,corners))
     res = np.int0(res)
-    img[res[:,1],res[:,0]]=[0,0,255]
-    img[res[:,3],res[:,2]] = [0,255,0]
+    tmp = res.shape[0]
+    for i in range(tmp):
+        img_to_plt = img
+        img_to_plt[res[i,1],res[i,0]]=[0,0,255]
+        img_to_plt[res[i,3],res[i,2]] = [255,0, 0]
+        plt.figure()
+        plt.imshow(img_to_plt)
 
-    cv.imshow('dst', img)
-    if cv.waitKey(0) & 0xff == 27:
-        cv.destroyAllWindows()
 
-    plt.show()
+    return np.int0(corners)
 
 def mathc(img1,img2):
     # Initiate ORB detector
@@ -112,13 +114,16 @@ def mathc(img1,img2):
 
 
 if __name__ == '__main__':
-    video_path = 'glass.mp4'
-    extractImages(video_path)
-    # makeVideoMask('pumpkinImgs')
-    # createVideo('pumpkinImgs', 'masks', 'videoSeg.avi', 30)
-    frames_num = list(range(0, 40, 6))
+    # video_path = 'pasta.mp4'
+    # extractImages(video_path)
+    # makeVideoMask('extractedImgs')
+    # createVideo('extractedImgs', 'masks', 'videoSeg.avi', 30)
+    frames_num = list(range(0, 10, 6))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
-    [cornerDetector(img) for img in frames]
+    corners = [cornerDetector(img) for img in frames]
+
+    plt.show()
+
     # [mathc(frames[0], frame) for frame in frames]
     print('all done')

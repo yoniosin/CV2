@@ -82,13 +82,13 @@ def harrisfeature(image):
 
     Response = (prod - 0.04 * np.power((sum_), 2)).reshape(-1)
     Reshaped_Response = Response.reshape(height - WINDOW_SIZE + 1, width - WINDOW_SIZE + 1)
-    R_final[WINDOW_SIZE / 2:height - (WINDOW_SIZE / 2), WINDOW_SIZE / 2:width - (WINDOW_SIZE / 2)] /= Reshaped_Response
+    R_final[WINDOW_SIZE / 2:height - (WINDOW_SIZE / 2), WINDOW_SIZE / 2:width - (WINDOW_SIZE / 2)] = Reshaped_Response
 
     R_feature = sliding_window(R_final, WINDOW_SIZE)
     R_max = R_feature.max(axis=-1).max(axis=-1)
 
     Reshaped_Response[R_max > Reshaped_Response] = 0
-    R_supressed_final[WINDOW_SIZE / 2:height - (WINDOW_SIZE / 2), WINDOW_SIZE / 2:width - (WINDOW_SIZE / 2)] /= Reshaped_Response
+    R_supressed_final[WINDOW_SIZE / 2:height - (WINDOW_SIZE / 2), WINDOW_SIZE / 2:width - (WINDOW_SIZE / 2)] = Reshaped_Response
     features = np.column_stack(np.where(R_supressed_final > HARRIS_CORNER_THRESHOLD))
 
     return features
