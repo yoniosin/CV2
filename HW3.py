@@ -15,15 +15,18 @@ class Frame:
         self.feature_points_vec = []
         self.cornerDetector()
 
-    @staticmethod
-    def GetIndexes(point, window_size):
-        x_idx = range(point[0] - window_size / 2, point[0] - window_size / 2 + 1)
-        y_idx = range(point[1] - window_size / 2, point[1] - window_size / 2 + 1)
+    def GetIndexes(self, point, window_size):
+        max_possible_size = min(point.x, self.img.shape[0] - point.x, point.y, self.img.shape[1] - point.y)
+        if window_size > max_possible_size:
+            raise ValueError
+
+        x_idx = list(range(int(point.x - window_size / 2), int(point.x + window_size / 2 + 1)))
+        y_idx = list(range(int(point.y - window_size / 2), int(point.y + window_size / 2 + 1)))
 
         return x_idx, y_idx
 
     def GetWindow(self, point, window_size):
-        return self.img[self.GetIndexes(point, window_size)]
+            return self.GetIndexes(point, window_size)
 
     @staticmethod
     def CalculateSSD(a, b):
@@ -108,7 +111,6 @@ class SourceFrame(Frame):
         self.coupled_points = {i: [] for i in range(self.frame_num)}
         self.affinne_mat = {i: np.empty((2, 3)) for i in range(self.frame_num)}
 
-
     def calcAffineTrans(self, dst_frame_idx, selected_idx_vec):
         reference_pts = np.zeros((3, 2))
         shifted_pts = np.zeros((3, 2))
@@ -125,24 +127,35 @@ class SourceFrame(Frame):
     def SearchFeaturePoints(src_point, L, dst_point_vec):
         points_in_range = []
         for potential_point in dst_point_vec:
-            if np.all(abs(potential_point - src_point) <= L / 2):
-                points_in_range.append(dst_point_vec)
+            if np.all(abs(np.asarray([potential_point.x - src_point.x, potential_point.y - src_point.y])) <= L / 2):
+                points_in_range.append(potential_point)
 
         return points_in_range
 
     def FindBestPoint(self, src_point, dst_frame, potential_point_vec, window_size):
         src_window = self.GetWindow(src_point, window_size)
-        ssd_vec = [self.CalculateSSD(src_window, dst_frame.GetWindow(dst_point, window_size)) for dst_point in
-                   potential_point_vec]
+        ssd_vec = []
+        for dst_point in potential_point_vec:
+            try:
+                ssd_vec.append(self.CalculateSSD(src_window, dst_frame.GetWindow(dst_point, window_size)))
+            except ValueError:
+                continue
+
         return potential_point_vec[np.argmin([ssd_vec])]
 
-    def AutomaticMatch(self, dst_frame, L, W):
+    def AutomaticMatch(self, dst_frame_idx, L, W):
+        dst_frame = self.frame_vec[dst_frame_idx]
         for src_point in self.feature_points_vec:
             points_in_range = self.SearchFeaturePoints(src_point, L, dst_frame.feature_points_vec)
             if len(points_in_range) == 0:
                 continue
-            best_point = points_in_range[0] if len(points_in_range) == 1 \
-                else self.FindBestPoint(src_point, dst_frame, points_in_range, W)
+            if len(points_in_range) == 1:
+                best_point = points_in_range[0]
+            else:
+                try:
+                    best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
+                except ValueError:
+                    continue
 
             self.AddCoupledPoints(dst_frame.idx, self.CoupledPoints(src_point, best_point))
 
@@ -184,6 +197,7 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
                  zip(estimated_points_list, real_points_list)]
     return np.asarray(dist_list)
 
+
 # def reconstractImgs(chosen_features, list_of_frames):
 #     reference_pts = chosen_features[0, :, :]
 #
@@ -217,5 +231,6 @@ if __name__ == '__main__':
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
-
+    for i in range(source_frame.frame_num):
+        source_frame.AutomaticMatch(i, 50, 50)
     print('all done')
