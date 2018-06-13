@@ -1,4 +1,3 @@
-import Q3
 import matplotlib.pyplot as plt
 from numpy.random import permutation
 import cv2 as cv
@@ -15,10 +14,14 @@ class Frame:
         self.feature_points_vec = []
         self.cornerDetector()
 
+    @staticmethod
+    def ThrowError():
+        raise FrameError
+
     def GetIndexes(self, point, window_size):
         max_possible_size = min(point.x, self.img.shape[0] - point.x, point.y, self.img.shape[1] - point.y)
         if window_size > max_possible_size:
-            raise ValueError
+            self.ThrowError()
 
         x_idx = list(range(int(point.x - window_size / 2), int(point.x + window_size / 2 + 1)))
         y_idx = list(range(int(point.y - window_size / 2), int(point.y + window_size / 2 + 1)))
@@ -26,14 +29,14 @@ class Frame:
         return x_idx, y_idx
 
     def GetWindow(self, point, window_size):
-            return self.GetIndexes(point, window_size)
+        return self.img[self.GetIndexes(point, window_size)]
 
     @staticmethod
     def CalculateSSD(a, b):
-        return np.sum((a - b ** 2))
+        return np.sum((a - b) ** 2)
 
     @staticmethod
-    def apllyAffineTrans(source_point, M):
+    def ApplyAffineTrans(source_point, M):
         return np.dot(M[:, :2], source_point) + M[:, -1]
 
     def cornerDetector(self):
@@ -106,10 +109,14 @@ class SourceFrame(Frame):
 
     def __init__(self, src_img, dst_img_vec):
         super().__init__(0, src_img)
-        self.frame_vec = [Frame(i, pic) for i, pic in enumerate(dst_img_vec)]
+        self.frame_vec = [Frame(k, pic) for k, pic in enumerate(dst_img_vec)]
         self.frame_num = len(self.frame_vec)
-        self.coupled_points = {i: [] for i in range(self.frame_num)}
-        self.affinne_mat = {i: np.empty((2, 3)) for i in range(self.frame_num)}
+        self.coupled_points = {k: [] for k in range(self.frame_num)}
+        self.affinne_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
+
+    @staticmethod
+    def ThrowError():
+        raise SourceFrameError
 
     def calcAffineTrans(self, dst_frame_idx, selected_idx_vec):
         reference_pts = np.zeros((3, 2))
@@ -134,11 +141,13 @@ class SourceFrame(Frame):
 
     def FindBestPoint(self, src_point, dst_frame, potential_point_vec, window_size):
         src_window = self.GetWindow(src_point, window_size)
+
         ssd_vec = []
         for dst_point in potential_point_vec:
             try:
                 ssd_vec.append(self.CalculateSSD(src_window, dst_frame.GetWindow(dst_point, window_size)))
-            except ValueError:
+            except FrameError:
+                dst_frame.feature_points_vec.remove(dst_point)
                 continue
 
         return potential_point_vec[np.argmin([ssd_vec])]
@@ -146,18 +155,20 @@ class SourceFrame(Frame):
     def AutomaticMatch(self, dst_frame_idx, L, W):
         dst_frame = self.frame_vec[dst_frame_idx]
         for src_point in self.feature_points_vec:
-            points_in_range = self.SearchFeaturePoints(src_point, L, dst_frame.feature_points_vec)
-            if len(points_in_range) == 0:
-                continue
-            if len(points_in_range) == 1:
-                best_point = points_in_range[0]
-            else:
-                try:
-                    best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
-                except ValueError:
+            try:
+                points_in_range = self.SearchFeaturePoints(src_point, L, dst_frame.feature_points_vec)
+                if len(points_in_range) == 0:
                     continue
 
-            self.AddCoupledPoints(dst_frame.idx, self.CoupledPoints(src_point, best_point))
+                if len(points_in_range) == 1:
+                    best_point = points_in_range[0]
+                else:
+                    best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
+
+                self.AddCoupledPoints(dst_frame.idx, self.CoupledPoints(src_point, best_point))
+            except SourceFrameError:
+                self.feature_points_vec.remove(src_point)
+                continue
 
     def AddCoupledPoints(self, dst_frame_idx, coupled_points):
         self.coupled_points[dst_frame_idx].append(coupled_points)
@@ -172,7 +183,7 @@ class SourceFrame(Frame):
 
             src_points_vec = self.coupled_points[dst_frame_idx].src_point
             dst_points_vec = self.coupled_points[dst_frame_idx].dst_point
-            source_trans = [self.apllyAffineTrans(source_point, M) for source_point in src_points_vec]
+            source_trans = [self.ApplyAffineTrans(source_point, M) for source_point in src_points_vec]
             points_dist = calcEuclideanDist(source_trans, dst_points_vec)
             inlier_group.append(src_points_vec[points_dist < 10])
 
@@ -223,6 +234,13 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
 #     reconst_img_list = reconstractImgs(chosen_features, frames)
 #
 #     [plotRconstImg(frame, reconst) for frame, reconst in zip(frames, reconst_img_list)]
+
+class SourceFrameError(ValueError):
+    pass
+
+
+class FrameError(ValueError):
+    pass
 
 
 if __name__ == '__main__':
