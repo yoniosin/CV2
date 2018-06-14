@@ -112,18 +112,20 @@ class SourceFrame(Frame):
         self.frame_vec = [Frame(k, pic) for k, pic in enumerate(dst_img_vec)]
         self.frame_num = len(self.frame_vec)
         self.coupled_points = {k: [] for k in range(self.frame_num)}
-        self.affinne_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
+        self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
+        self.affine_inv_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
+        self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
 
     @staticmethod
     def ThrowError():
         raise SourceFrameError
 
     def calcAffineTrans(self, dst_frame_idx, selected_idx_vec):
-        reference_pts = np.zeros((3, 2))
-        shifted_pts = np.zeros((3, 2))
+        reference_pts = np.zeros((3, 2), dtype=np.float32)
+        shifted_pts = np.zeros((3, 2), dtype=np.float32)
         for i, selected_idx in enumerate(selected_idx_vec):
-            reference_pts[i, :] = self.coupled_points[dst_frame_idx][selected_idx].src_point
-            shifted_pts[i, :] = self.coupled_points[dst_frame_idx][selected_idx].dst_point
+            reference_pts[i, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].src_point)
+            shifted_pts[i, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].dst_point)
 
         M = cv.getAffineTransform(reference_pts, shifted_pts)
         iM = np.zeros(M.shape)
@@ -174,37 +176,46 @@ class SourceFrame(Frame):
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
     def RANSAC(self, dst_frame_idx):
-        inlier_group = []
         biggest_inlier = []
         best_M = np.empty((2, 3))
+        best_iM = np.empty((2, 3))
         for _ in range(100):
             rand_pts_idx = permutation(len(self.coupled_points[dst_frame_idx]))[:3]
-            M, _ = self.calcAffineTrans(dst_frame_idx, rand_pts_idx)
+            M, iM = self.calcAffineTrans(dst_frame_idx, rand_pts_idx)
 
-            src_points_vec = self.coupled_points[dst_frame_idx].src_point
-            dst_points_vec = self.coupled_points[dst_frame_idx].dst_point
+            src_points_vec = [couple.src_point for couple in self.coupled_points[dst_frame_idx]]
+            dst_points_vec = [couple.dst_point for couple in self.coupled_points[dst_frame_idx]]
             source_trans = [self.ApplyAffineTrans(source_point, M) for source_point in src_points_vec]
             points_dist = calcEuclideanDist(source_trans, dst_points_vec)
-            inlier_group.append(src_points_vec[points_dist < 10])
+            inlier_idx = np.where(points_dist < 10)[0]
+            inlier_group = [src_points_vec[idx] for idx in inlier_idx]
 
             if len(inlier_group) > len(biggest_inlier):
                 biggest_inlier = inlier_group
                 best_M = M
+                best_iM = iM
+                best_dist = points_dist
 
-        self.affinne_mat[dst_frame_idx] = best_M
+        self.affine_mat[dst_frame_idx] = best_M
+        self.affine_inv_mat[dst_frame_idx] = best_iM
 
+    def applyInvAffineTrans(self):
+        rows, cols, ch = self.img.shape
+        for i in range(self.frame_num):
+            self.inv_affine_imgs[i] = (cv.warpAffine(self.frame_vec[i].img, self.affine_inv_mat[i], (cols, rows)))
 
 ''' Aux Methods'''
 
 
-def plotRconstImg(input, output):
-    plt.subplot(121), plt.imshow(input), plt.title('Input')
-    plt.subplot(122), plt.imshow(output), plt.title('Output')
+def plotRconstImg(input, output, real):
+    plt.subplot(131), plt.imshow(input), plt.title('Input')
+    plt.subplot(132), plt.imshow(output), plt.title('Output')
+    plt.subplot(133), plt.imshow(real), plt.title('real')
     plt.show()
 
 
 def calcEuclideanDist(estimated_points_list, real_points_list):
-    dist_list = [np.linalg.norm(estimated_point, real_point) for estimated_point, real_point in
+    dist_list = [np.linalg.norm(estimated_point - real_point, 2) for estimated_point, real_point in
                  zip(estimated_points_list, real_points_list)]
     return np.asarray(dist_list)
 
@@ -244,11 +255,19 @@ class FrameError(ValueError):
 
 
 if __name__ == '__main__':
-    frames_num = list(range(20, 100, 15))
+
+    frames_num_manual = list(range(20, 100, 15))
+    frames_num = list(range(20, 150, 20))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
     for i in range(source_frame.frame_num):
-        source_frame.AutomaticMatch(i, 50, 50)
+        source_frame.AutomaticMatch(i, 20, 15)
+        source_frame.RANSAC(i)
+        source_frame.applyInvAffineTrans()
+
+    for i in range(source_frame.frame_num):
+        output = source_frame.inv_affine_imgs[i]
+        plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
     print('all done')
