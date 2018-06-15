@@ -29,11 +29,14 @@ class Frame:
         return x_idx, y_idx
 
     def GetWindow(self, point, window_size):
-        return self.img[self.GetIndexes(point, window_size)]
+        rows, cols = self.GetIndexes(point, window_size)
+        res = self.img[rows]
+        return res[:, cols, :]
 
     @staticmethod
     def CalculateSSD(a, b):
-        return np.sum((a - b) ** 2)
+        tmp = np.linalg.norm(np.linalg.norm((a - b), 2, 2), 1)
+        return tmp
 
     @staticmethod
     def ApplyAffineTrans(source_point, M):
@@ -115,6 +118,7 @@ class SourceFrame(Frame):
         self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
         self.affine_inv_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
         self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
+        self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
 
     @staticmethod
     def ThrowError():
@@ -199,6 +203,11 @@ class SourceFrame(Frame):
         self.affine_mat[dst_frame_idx] = best_M
         self.affine_inv_mat[dst_frame_idx] = best_iM
 
+    def applyAffineTrans(self):
+        rows, cols, ch = self.img.shape
+        for i in range(self.frame_num):
+            self.affine_imgs[i] = (cv.warpAffine(self.img, self.affine_mat[i], (cols, rows)))
+
     def applyInvAffineTrans(self):
         rows, cols, ch = self.img.shape
         for i in range(self.frame_num):
@@ -208,9 +217,9 @@ class SourceFrame(Frame):
 
 
 def plotRconstImg(input, output, real):
-    plt.subplot(131), plt.imshow(input), plt.title('Input')
-    plt.subplot(132), plt.imshow(output), plt.title('Output')
-    plt.subplot(133), plt.imshow(real), plt.title('real')
+    plt.subplot(131), plt.imshow(input), plt.title('frame')
+    plt.subplot(132), plt.imshow(output), plt.title('trans frame')
+    plt.subplot(133), plt.imshow(real), plt.title('reference')
     plt.show()
 
 
@@ -263,11 +272,17 @@ if __name__ == '__main__':
 
     source_frame = SourceFrame(frames[0], frames[1:])
     for i in range(source_frame.frame_num):
-        source_frame.AutomaticMatch(i, 20, 15)
+        source_frame.AutomaticMatch(i, 50, 40)
         source_frame.RANSAC(i)
-        source_frame.applyInvAffineTrans()
 
+    source_frame.applyAffineTrans()
+    source_frame.applyInvAffineTrans()
+
+    # for i in range(source_frame.frame_num):
+    #     output = source_frame.affine_imgs[i]
+    #     plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
+    #
     for i in range(source_frame.frame_num):
         output = source_frame.inv_affine_imgs[i]
-        plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
+        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
     print('all done')
