@@ -202,6 +202,17 @@ class SourceFrame(Frame):
         for k in range(self.frame_num):
             self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
 
+    def CreateTrajectoryMat(self, trajectories_list):
+        traj_mat = np.zeros((self.frame_num, len(trajectories_list)))
+        for trajectory_idx, trajectory in enumerate(trajectories_list):
+            for frame_idx in trajectory.key:
+                x_mat_idx = 2 * frame_idx
+                traj_mat[trajectory_idx, x_mat_idx] = trajectory.value.x
+                y_mat_idx = x_mat_idx + 1
+                traj_mat[trajectory_idx, y_mat_idx] = trajectory.value.y
+
+        return traj_mat
+
 
 ''' Aux Methods'''
 
