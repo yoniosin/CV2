@@ -270,9 +270,20 @@ def section3(src_frame):
         plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
         plt.show()
 
+
 def smartStbilization(source_frame, k, delta):
     traj = source_frame.CreateTrajectoryMat()
     broken_mat_list = breakTrajMat(traj, k, delta)
+    e_list = []
+    c_list = []
+    u, s, vh = svd_t(M0, n_components=r) - python
+
+    c = np.matmul(u, np.diag(s))
+    e = vh
+
+    e_stab[n, :] = filter(e[n, :])
+    (ממליץ על from scipy.signal import savgol_filter as filter)
+    M0_stab = np.matmul(c, e_stab
 
 
 
