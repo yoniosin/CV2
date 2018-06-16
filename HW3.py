@@ -4,6 +4,7 @@ from Q3 import *
 from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
 
+
 class Frame:
     Point = namedtuple('Point', ['x', 'y'])
 
@@ -271,10 +272,10 @@ def section3(src_frame):
         plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
         plt.show()
 
-def smartStbilization(source_frame, k, delta):
-    traj = source_frame.CreateTrajectoryMat()
-    broken_mat_list = breakTrajMat(traj, k, delta)
 
+def smartStabilization(src_frame, k, delta):
+    traj = src_frame.CreateTrajectoryMat()
+    broken_mat_list = breakTrajMat(traj, k, delta)
 
 
 def breakTrajMat(traj_mat, k, delta):
@@ -304,9 +305,6 @@ if __name__ == '__main__':
     smat[:6, :6] = np.diag(s)
     np.allclose(a, np.dot(u, np.dot(smat, vh)))
 
-
-
-
     # extractImages('pen.mp4', 'extractedImgs')
     # makeVideoMask('extractedImgs')
     # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
@@ -318,7 +316,6 @@ if __name__ == '__main__':
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
-
 
     for i in range(source_frame.frame_num):
         source_frame.AutomaticMatch(i, 100, 40)
