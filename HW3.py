@@ -56,7 +56,7 @@ class Frame:
         return tmp
 
     @staticmethod
-    def ApplyAffineTrans(source_point, M):
+    def applyAffineTransPerPoint(source_point, M):
         return np.dot(M[:, :2], np.asarray([source_point.x, source_point.y])) + M[:, -1]
 
     def cornerDetector(self):
@@ -178,7 +178,7 @@ class SourceFrame(Frame):
 
             src_points_vec = [couple.src_point for couple in coupled_points_list]
             dst_points_vec = [couple.dst_point for couple in coupled_points_list]
-            source_trans = [self.ApplyAffineTrans(source_point, M) for source_point in src_points_vec]
+            source_trans = [self.applyAffineTransPerPoint(source_point, M) for source_point in src_points_vec]
             points_dist = calcEuclideanDist(source_trans, dst_points_vec)
             inlier_idx = np.where(points_dist < thresh)[0]
             inlier_group = [src_points_vec[idx] for idx in inlier_idx]
@@ -190,12 +190,12 @@ class SourceFrame(Frame):
 
         return best_M, best_iM
 
-    def applyAffineTrans(self):
+    def applyAffineTransForAllFrames(self):
         rows, cols, ch = self.img.shape
         for k in range(self.frame_num):
             self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
 
-    def applyInvAffineTrans(self):
+    def applyInvAffineTransForAllFrames(self):
         rows, cols, ch = self.img.shape
         for k in range(self.frame_num):
             self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
@@ -355,7 +355,7 @@ if __name__ == '__main__':
 
     section2(source_frame)
     # source_frame.smartStabilization(50, 5, 9)
-    # source_frame.applyInvAffineTrans()
+    # source_frame.applyInvAffineTransForAllFrames()
 
 
 
@@ -365,8 +365,8 @@ if __name__ == '__main__':
 
     # section3(source_frame)
 
-    source_frame.applyAffineTrans()
-    source_frame.applyInvAffineTrans()
+    source_frame.applyAffineTransForAllFrames()
+    source_frame.applyInvAffineTransForAllFrames()
 
     # for i in range(source_frame.frame_num):
     #     output = source_frame.affine_imgs[i]
