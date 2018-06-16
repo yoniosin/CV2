@@ -19,8 +19,8 @@ class Frame:
         self.cornerDetector()
 
         self.img_with_harris = self.img
-        # for point in self.feature_points_vec:
-        #     self.ZeroPixelsInWindow(point, 10, self.img_with_harris, 255)
+        for point in self.feature_points_vec:
+            self.ZeroPixelsInWindow(point, 10, self.img_with_harris, 255)
 
     def ZeroPixelsInWindow(self, center, window_size, img, color):
         try:
@@ -335,20 +335,27 @@ def breakTrajMat(traj_mat, k, delta):
     return mat_list
 
 
-if __name__ == '__main__':
-    # extractImages('pen.mp4', 'extractedImgs')
-    # makeVideoMask('extractedImgs')
-    # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
-    # extractImages('masked_pen.avi', 'masked_extracted')
+def section2(data_set):
+    for frame in data_set.frame_vec[::20]:
+        plt.figure()
+        plt.imshow(frame.img_with_harris)
+        plt.title('Frame #' + str(frame.idx) + 'Corners Detected using Harris')
+        plt.show()
 
-    frames_num_manual = list(range(20, 100, 15))
+
+# def section4(data_set):
+
+
+if __name__ == '__main__':
+    # create data-set
     frames_num = list(range(151))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
-
     source_frame = SourceFrame(frames[0], frames[1:])
-    source_frame.smartStabilization(50, 5, 9)
-    source_frame.applyInvAffineTrans()
+
+    section2(source_frame)
+    # source_frame.smartStabilization(50, 5, 9)
+    # source_frame.applyInvAffineTrans()
 
 
 
