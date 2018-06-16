@@ -77,7 +77,7 @@ class Frame:
         corners = cv.cornerSubPix(gray, np.float32(centroids), (5, 5), (-1, -1), criteria)
 
         for k in range(corners.shape[0]):
-            point = self.Point(corners[k, 0], corners[k, 1])
+            point = Point(corners[k, 0], corners[k, 1])
             self.feature_points_vec.append(point)
 
 
@@ -168,11 +168,11 @@ class SourceFrame(Frame):
         self.affine_mat[dst_frame_idx] = best_M
         self.affine_inv_mat[dst_frame_idx] = best_iM
 
-    def RANSAC(self, coupled_points_list):
+    def RANSAC(self, coupled_points_list, iter_num=100):
         biggest_inlier = []
         best_M = np.empty((2, 3))
         best_iM = np.empty((2, 3))
-        for _ in range(100):
+        for _ in range(iter_num):
             rand_pts_idx = permutation(len(coupled_points_list))[:3]
             M, iM = self.calcAffineTrans(coupled_points_list, rand_pts_idx)
 
@@ -215,24 +215,34 @@ class SourceFrame(Frame):
     def smartStabilization(self, k, delta, r):
         trajectory = self.CreateTrajectoryMat()
         broken_mat_list = breakTrajMat(trajectory, k, delta)
+        affine_mat_dict = {}
 
-        svd_out = []
-        for mat in broken_mat_list:
+        for mat_num, mat in enumerate(broken_mat_list):
             u, s, vh = svd_t(mat, n_components=r)
             c = np.matmul(u, np.diag(s))
-            e = savgol_filter(vh, 161, 1, axis=1)
+            e = np.zeros((r, k))
 
-            new_mat = np.dot(c, e)
-            x_mat, y_mat = ExtractCoorFromM(mat)
+            for m in range(r):
+                e[m, :] = savgol_filter(vh[m, :], 49, 1)
+
+            max_window = delta if mat_num < len(broken_mat_list) - 1 else k
+            new_mat = np.dot(c, e)[:, :max_window]
+            x_mat, y_mat = ExtractCoorFromM(mat[:, :max_window])
             x_new_mat, y_new_mat = ExtractCoorFromM(new_mat)
 
-            coupled_points = []
-            for x_coor, y_coor, new_x_coor, new_y_coor in zip(x_mat, y_mat, x_new_mat, y_new_mat):
-                original_point = Point(x_coor, y_coor)
-                smoothed_point = Point(new_x_coor, new_y_coor)
-                coupled_points.append(CoupledPoints(original_point, smoothed_point))
+            for column_idx, (x_column, y_column, new_x_column, new_y_column) in \
+                    enumerate(zip(x_mat.T, y_mat.T, x_new_mat.T, y_new_mat.T)):
+                coupled_points = []
+                for j in range(len(x_column)):
+                    original_point = Point(x_column[j], y_column[j])
+                    smoothed_point = Point(new_x_column[j], new_y_column[j])
+                    coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-            return coupled_points
+                affine_mat, _ = self.RANSAC(coupled_points, 10)
+
+                affine_mat_dict[mat_num * delta + column_idx] = affine_mat
+
+        self.affine_mat = affine_mat_dict
 
 
 def ExtractCoorFromM(mat):
@@ -312,7 +322,7 @@ def breakTrajMat(traj_mat, k, delta):
     rows, cols = traj_mat.shape
 
     start_frame = 0
-    end_frame = delta - 1
+    end_frame = k - 1
     while end_frame < cols:
         new_mat = traj_mat[:, range(start_frame, end_frame + 1)]
         start_frame += delta
@@ -336,10 +346,14 @@ if __name__ == '__main__':
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
+    source_frame.smartStabilization(50, 5, 9)
+    source_frame.applyAffineTrans()
+
+
 
     for i in range(source_frame.frame_num):
         source_frame.AutomaticMatch(i, 100, 40)
-        source_frame.RANSAC(i)
+        source_frame.runRANSACForFrame(i)
 
     # section3(source_frame)
 
@@ -353,7 +367,8 @@ if __name__ == '__main__':
     # for i in range(source_frame.frame_num):
     #     output = source_frame.inv_affine_imgs[i]
     #     plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
-    #
+
     stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(source_frame.frame_num)]
     createVideoFromList(stabilized_img, 'stabi.avi', 20)
+
     print('all done')
