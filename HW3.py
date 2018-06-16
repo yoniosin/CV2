@@ -29,7 +29,7 @@ class Frame:
             return
         for x_idx in x_idx_vec:
             for y_idx in y_idx_vec:
-                img[y_idx, x_idx] = [0, 0, color]
+                img[y_idx, x_idx] = color
 
     @staticmethod
     def ThrowError():
@@ -149,7 +149,8 @@ class SourceFrame(Frame):
                 else:
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
-                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, 255 - 10 * k)
+                color = color = np.random.randint(0,255,(100,3))
+                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, color)
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
@@ -343,8 +344,8 @@ def section2(data_set):
         plt.show()
 
 
-# def section4(data_set):
-
+def section6(data_set):
+    for frame in data_set.frame_vec[::20]
 
 if __name__ == '__main__':
     # create data-set
