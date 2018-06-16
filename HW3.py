@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 from numpy.random import permutation
-from collections import namedtuple
 from Q3 import *
 from klt import *
-
+from sklearn.utils.extmath import randomized_svd as svd_t
 
 class Frame:
     Point = namedtuple('Point', ['x', 'y'])
@@ -192,14 +191,15 @@ class SourceFrame(Frame):
         for k in range(self.frame_num):
             self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
 
-    def CreateTrajectoryMat(self, trajectories_list):
-        traj_mat = np.zeros((self.frame_num, len(trajectories_list)))
+    def CreateTrajectoryMat(self):
+        trajectories_list = self.trajectories.trajectory_list
+        traj_mat = np.zeros((2 * len(trajectories_list), self.frame_num))
         for trajectory_idx, trajectory in enumerate(trajectories_list):
-            for frame_idx in trajectory.key:
-                x_mat_idx = 2 * frame_idx
-                traj_mat[trajectory_idx, x_mat_idx] = trajectory.value.x
+            for frame_idx in trajectory.keys():
+                x_mat_idx = 2 * trajectory_idx
+                traj_mat[x_mat_idx, frame_idx] = trajectory[frame_idx].x
                 y_mat_idx = x_mat_idx + 1
-                traj_mat[trajectory_idx, y_mat_idx] = trajectory.value.y
+                traj_mat[y_mat_idx, frame_idx] = trajectory[frame_idx].y
 
         return traj_mat
 
@@ -271,19 +271,55 @@ def section3(src_frame):
         plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
         plt.show()
 
+def smartStbilization(source_frame, k, delta):
+    traj = source_frame.CreateTrajectoryMat()
+    broken_mat_list = breakTrajMat(traj, k, delta)
+
+
+
+def breakTrajMat(traj_mat, k, delta):
+    mat_list = []
+    rows, cols = traj_mat.shaepe
+
+    start_frame = 0
+    end_frame = delta - 1
+    while end_frame < cols:
+        new_mat = traj_mat[:, range(start_frame, end_frame + 1)]
+        start_frame += delta
+        end_frame += delta
+
+        new_mat[(new_mat != 0).all(axis=1)]
+        mat_list.append(new_mat)
+
+    return mat_list
+
 
 if __name__ == '__main__':
+
+    a = np.random.randint(0, 8, (5, 10))
+    u, s, vh = np.linalg.svd(a, full_matrices=True)
+    tmp = u[:, :6] * s
+    np.allclose(a, np.dot(tmp, vh))
+    smat = np.zeros((9, 6), dtype=complex)
+    smat[:6, :6] = np.diag(s)
+    np.allclose(a, np.dot(u, np.dot(smat, vh)))
+
+
+
+
     # extractImages('pen.mp4', 'extractedImgs')
     # makeVideoMask('extractedImgs')
     # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
     # extractImages('masked_pen.avi', 'masked_extracted')
 
     frames_num_manual = list(range(20, 100, 15))
-    frames_num = list(range(5))
+    frames_num = list(range(150))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
+
+
     for i in range(source_frame.frame_num):
         source_frame.AutomaticMatch(i, 100, 40)
         source_frame.RANSAC(i)

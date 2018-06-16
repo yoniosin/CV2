@@ -11,9 +11,8 @@ class TrajList:
         self.klt(frames_vec)
 
     def addTrajPoint(self, frame_idx, p0, p1):
-        p0 = self.Point(p0[0, 0], p0[0, 1])
-        p1 = self.Point(p1[0, 0], p1[0, 1])
-
+        p0 = self.Point(p0[0, 1], p0[0, 0])
+        p1 = self.Point(p1[0, 1], p1[0, 0])
         for trajectory in self.trajectory_list:
             if (frame_idx - 1) in trajectory.keys() and trajectory[frame_idx - 1] == p0:
                 trajectory[frame_idx] = p1
@@ -22,6 +21,8 @@ class TrajList:
         raise ValueError
 
     def addNewTraj(self, frame_idx, p0, p1):
+        p0 = self.Point(p0[0, 1], p0[0, 0])
+        p1 = self.Point(p1[0, 1], p1[0, 0])
         self.trajectory_list.append({frame_idx - 1: p0, frame_idx: p1})
 
     @staticmethod
