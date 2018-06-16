@@ -78,17 +78,6 @@ class Frame:
             self.feature_points_vec.append(point)
 
 
-def initChosenFeatures(corners):
-    chosen_features = np.empty((6, 3, 2), dtype=np.float32)
-
-    features_mat = [[1, 6, 13], [1, 9, 18], [1, 8, 14], [3, 10, 18], [1, 6, 13], [6, 13, 19]]
-
-    for k in range(6):
-        chosen_features[k, :, :] = corners[k][features_mat[k], :]
-
-    return chosen_features
-
-
 class SourceFrame(Frame):
     CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
@@ -102,7 +91,6 @@ class SourceFrame(Frame):
         self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.trajectories = TrajList(self.frame_vec)
-
 
     @staticmethod
     def ThrowError():
@@ -214,7 +202,28 @@ class SourceFrame(Frame):
                 traj_mat[trajectory_idx, y_mat_idx] = trajectory.value.y
 
         return traj_mat
+
+
+class SourceFrameError(ValueError):
+    pass
+
+
+class FrameError(ValueError):
+    pass
+
+
 ''' Aux Methods'''
+
+
+def initChosenFeatures(corners):
+    chosen_features = np.empty((6, 3, 2), dtype=np.float32)
+
+    features_mat = [[1, 6, 13], [1, 9, 18], [1, 8, 14], [3, 10, 18], [1, 6, 13], [6, 13, 19]]
+
+    for k in range(6):
+        chosen_features[k, :, :] = corners[k][features_mat[k], :]
+
+    return chosen_features
 
 
 def plotRconstImg(input_img, output, real):
@@ -255,14 +264,6 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
 #     reconst_img_list = reconstractImgs(chosen_features, frames)
 #
 #     [plotRconstImg(frame, reconst) for frame, reconst in zip(frames, reconst_img_list)]
-
-class SourceFrameError(ValueError):
-    pass
-
-
-class FrameError(ValueError):
-    pass
-
 
 def section3(src_frame):
     for frame in src_frame.frame_vec:
