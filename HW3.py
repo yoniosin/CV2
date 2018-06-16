@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from numpy.random import permutation
 from collections import namedtuple
 from Q3 import *
+from klt import *
 
 
 class Frame:
@@ -100,6 +101,8 @@ class SourceFrame(Frame):
         self.affine_inv_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
         self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
+        self.trajectories = TrajList(self.frame_vec)
+
 
     @staticmethod
     def ThrowError():
@@ -163,9 +166,8 @@ class SourceFrame(Frame):
     def AddCoupledPoints(self, dst_frame_idx, coupled_points, color, k):
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
-        if k < 6:
-            self.ZeroPixelsInWindow(coupled_points.src_point, 10, self.frame_vec[dst_frame_idx].reference_img, color)
-            self.ZeroPixelsInWindow(coupled_points.dst_point, 10, self.frame_vec[dst_frame_idx].img, color)
+        self.ZeroPixelsInWindow(coupled_points.src_point, 10, self.frame_vec[dst_frame_idx].reference_img, color)
+        self.ZeroPixelsInWindow(coupled_points.dst_point, 10, self.frame_vec[dst_frame_idx].img, color)
 
     def RANSAC(self, dst_frame_idx):
         biggest_inlier = []
@@ -202,7 +204,16 @@ class SourceFrame(Frame):
         for k in range(self.frame_num):
             self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
 
+    def CreateTrajectoryMat(self, trajectories_list):
+        traj_mat = np.zeros((self.frame_num, len(trajectories_list)))
+        for trajectory_idx, trajectory in enumerate(trajectories_list):
+            for frame_idx in trajectory.key:
+                x_mat_idx = 2 * frame_idx
+                traj_mat[trajectory_idx, x_mat_idx] = trajectory.value.x
+                y_mat_idx = x_mat_idx + 1
+                traj_mat[trajectory_idx, y_mat_idx] = trajectory.value.y
 
+        return traj_mat
 ''' Aux Methods'''
 
 
@@ -267,7 +278,7 @@ if __name__ == '__main__':
     # extractImages('masked_pen.avi', 'masked_extracted')
 
     frames_num_manual = list(range(20, 100, 15))
-    frames_num = list(range(85))
+    frames_num = list(range(5))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
 
