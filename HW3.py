@@ -168,7 +168,7 @@ class SourceFrame(Frame):
         self.affine_mat[dst_frame_idx] = best_M
         self.affine_inv_mat[dst_frame_idx] = best_iM
 
-    def RANSAC(self, coupled_points_list, iter_num=100):
+    def RANSAC(self, coupled_points_list, iter_num=100, thresh=30):
         biggest_inlier = []
         best_M = np.empty((2, 3))
         best_iM = np.empty((2, 3))
@@ -180,7 +180,7 @@ class SourceFrame(Frame):
             dst_points_vec = [couple.dst_point for couple in coupled_points_list]
             source_trans = [self.ApplyAffineTrans(source_point, M) for source_point in src_points_vec]
             points_dist = calcEuclideanDist(source_trans, dst_points_vec)
-            inlier_idx = np.where(points_dist < 30)[0]
+            inlier_idx = np.where(points_dist < thresh)[0]
             inlier_group = [src_points_vec[idx] for idx in inlier_idx]
 
             if len(inlier_group) > len(biggest_inlier):
@@ -193,7 +193,7 @@ class SourceFrame(Frame):
     def applyAffineTrans(self):
         rows, cols, ch = self.img.shape
         for k in range(self.frame_num):
-            self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[i], (cols, rows)))
+            self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
 
     def applyInvAffineTrans(self):
         rows, cols, ch = self.img.shape
@@ -215,7 +215,7 @@ class SourceFrame(Frame):
     def smartStabilization(self, k, delta, r):
         trajectory = self.CreateTrajectoryMat()
         broken_mat_list = breakTrajMat(trajectory, k, delta)
-        affine_mat_dict = {}
+        inv_affine_mat_dict = {}
 
         for mat_num, mat in enumerate(broken_mat_list):
             u, s, vh = svd_t(mat, n_components=r)
@@ -238,11 +238,12 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                affine_mat, _ = self.RANSAC(coupled_points, 10)
+                _, inv_affine_mat = self.RANSAC(coupled_points, 10, 5)
 
-                affine_mat_dict[mat_num * delta + column_idx] = affine_mat
+                frame_idx = mat_num * delta + column_idx
+                inv_affine_mat_dict[frame_idx] = inv_affine_mat
 
-        self.affine_mat = affine_mat_dict
+        self.inv_affine_mat = inv_affine_mat_dict
 
 
 def ExtractCoorFromM(mat):
@@ -323,7 +324,7 @@ def breakTrajMat(traj_mat, k, delta):
 
     start_frame = 0
     end_frame = k - 1
-    while end_frame < cols:
+    while end_frame <= cols:
         new_mat = traj_mat[:, range(start_frame, end_frame + 1)]
         start_frame += delta
         end_frame += delta
@@ -341,19 +342,19 @@ if __name__ == '__main__':
     # extractImages('masked_pen.avi', 'masked_extracted')
 
     frames_num_manual = list(range(20, 100, 15))
-    frames_num = list(range(150))
+    frames_num = list(range(151))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
     source_frame.smartStabilization(50, 5, 9)
-    source_frame.applyAffineTrans()
+    source_frame.applyInvAffineTrans()
 
 
 
-    for i in range(source_frame.frame_num):
-        source_frame.AutomaticMatch(i, 100, 40)
-        source_frame.runRANSACForFrame(i)
+    # for i in range(source_frame.frame_num):
+    #     source_frame.AutomaticMatch(i, 100, 40)
+    #     source_frame.runRANSACForFrame(i)
 
     # section3(source_frame)
 
@@ -364,9 +365,9 @@ if __name__ == '__main__':
     #     output = source_frame.affine_imgs[i]
     #     plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
     #
-    # for i in range(source_frame.frame_num):
-    #     output = source_frame.inv_affine_imgs[i]
-    #     plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
+    for i in range(source_frame.frame_num):
+        output = source_frame.inv_affine_imgs[i]
+        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
 
     stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(source_frame.frame_num)]
     createVideoFromList(stabilized_img, 'stabi.avi', 20)
