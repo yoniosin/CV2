@@ -1,7 +1,5 @@
 import matplotlib.pyplot as plt
 from numpy.random import permutation
-import cv2 as cv
-import numpy as np
 from collections import namedtuple
 from Q3 import *
 
@@ -27,7 +25,7 @@ class Frame:
             return
         for x_idx in x_idx_vec:
             for y_idx in y_idx_vec:
-                img[y_idx ,x_idx] = [0, 0, color]
+                img[y_idx, x_idx] = [0, 0, color]
 
     @staticmethod
     def ThrowError():
@@ -74,8 +72,8 @@ class Frame:
         criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 0.001)
         corners = cv.cornerSubPix(gray, np.float32(centroids), (5, 5), (-1, -1), criteria)
 
-        for i in range(corners.shape[0]):
-            point = self.Point(corners[i, 0], corners[i, 1])
+        for k in range(corners.shape[0]):
+            point = self.Point(corners[k, 0], corners[k, 1])
             self.feature_points_vec.append(point)
 
 
@@ -84,8 +82,8 @@ def initChosenFeatures(corners):
 
     features_mat = [[1, 6, 13], [1, 9, 18], [1, 8, 14], [3, 10, 18], [1, 6, 13], [6, 13, 19]]
 
-    for i in range(6):
-        chosen_features[i, :, :] = corners[i][features_mat[i], :]
+    for k in range(6):
+        chosen_features[k, :, :] = corners[k][features_mat[k], :]
 
     return chosen_features
 
@@ -110,9 +108,9 @@ class SourceFrame(Frame):
     def calcAffineTrans(self, dst_frame_idx, selected_idx_vec):
         reference_pts = np.zeros((3, 2), dtype=np.float32)
         shifted_pts = np.zeros((3, 2), dtype=np.float32)
-        for i, selected_idx in enumerate(selected_idx_vec):
-            reference_pts[i, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].src_point)
-            shifted_pts[i, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].dst_point)
+        for k, selected_idx in enumerate(selected_idx_vec):
+            reference_pts[k, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].src_point)
+            shifted_pts[k, :] = np.round(self.coupled_points[dst_frame_idx][selected_idx].dst_point)
 
         M = cv.getAffineTransform(reference_pts, shifted_pts)
         iM = np.zeros(M.shape)
@@ -194,22 +192,22 @@ class SourceFrame(Frame):
         self.affine_mat[dst_frame_idx] = best_M
         self.affine_inv_mat[dst_frame_idx] = best_iM
 
-
     def applyAffineTrans(self):
         rows, cols, ch = self.img.shape
-        for i in range(self.frame_num):
-            self.affine_imgs[i] = (cv.warpAffine(self.img, self.affine_mat[i], (cols, rows)))
+        for k in range(self.frame_num):
+            self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[i], (cols, rows)))
 
     def applyInvAffineTrans(self):
         rows, cols, ch = self.img.shape
-        for i in range(self.frame_num):
-            self.inv_affine_imgs[i] = (cv.warpAffine(self.frame_vec[i].img, self.affine_inv_mat[i], (cols, rows)))
+        for k in range(self.frame_num):
+            self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
+
 
 ''' Aux Methods'''
 
 
-def plotRconstImg(input, output, real):
-    plt.subplot(131), plt.imshow(input), plt.title('frame')
+def plotRconstImg(input_img, output, real):
+    plt.subplot(131), plt.imshow(input_img), plt.title('frame')
     plt.subplot(132), plt.imshow(output), plt.title('trans frame')
     plt.subplot(133), plt.imshow(real), plt.title('reference')
     plt.show()
@@ -219,6 +217,7 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
     dist_list = [np.linalg.norm(estimated_point - real_point, 2) for estimated_point, real_point in
                  zip(estimated_points_list, real_points_list)]
     return np.asarray(dist_list)
+
 
 # def reconstractImgs(chosen_features, list_of_frames):
 #     reference_pts = chosen_features[0, :, :]
@@ -254,19 +253,19 @@ class FrameError(ValueError):
     pass
 
 
-def section3(source_frame):
-    frames = source_frame.frame_vec
-    for frame in frames:
+def section3(src_frame):
+    for frame in src_frame.frame_vec:
         plt.subplot(121), plt.imshow(frame.reference_img), plt.title('reference')
         plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
         plt.show()
 
 
 if __name__ == '__main__':
-    extractImages('pen.mp4', 'extractedImgs')
+    # extractImages('pen.mp4', 'extractedImgs')
     # makeVideoMask('extractedImgs')
     # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
     # extractImages('masked_pen.avi', 'masked_extracted')
+
     frames_num_manual = list(range(20, 100, 15))
     frames_num = list(range(85))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
@@ -291,5 +290,5 @@ if __name__ == '__main__':
     #     plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
     #
     stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(source_frame.frame_num)]
-    createVideoFromList(stabilized_img,'stabi.avi', 20)
+    createVideoFromList(stabilized_img, 'stabi.avi', 20)
     print('all done')
