@@ -3,6 +3,7 @@ from numpy.random import permutation
 from Q3 import *
 from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
+from scipy.signal import savgol_filter
 
 
 class Frame:
@@ -204,6 +205,20 @@ class SourceFrame(Frame):
 
         return traj_mat
 
+    def smartStabilization(self, k, delta, r):
+        trajectory = self.CreateTrajectoryMat()
+        broken_mat_list = breakTrajMat(trajectory, k, delta)
+
+        svd_out = []
+        for mat in broken_mat_list:
+            u, s, vh = svd_t(mat, n_components=r)
+            c = np.matmul(u, np.diag(s))
+            e = savgol_filter(vh, 161, 1, axis=1)
+
+            new_mat = np.dot(c, e)
+            svd_out.append(SVD_Res(mat, new_mat))
+
+
 
 class SourceFrameError(ValueError):
     pass
@@ -273,14 +288,12 @@ def section3(src_frame):
         plt.show()
 
 
-def smartStabilization(src_frame, k, delta):
-    traj = src_frame.CreateTrajectoryMat()
-    broken_mat_list = breakTrajMat(traj, k, delta)
+SVD_Res = namedtuple('SVD_Res', ['Original', 'Smoothed'])
 
 
 def breakTrajMat(traj_mat, k, delta):
     mat_list = []
-    rows, cols = traj_mat.shaepe
+    rows, cols = traj_mat.shape
 
     start_frame = 0
     end_frame = delta - 1
@@ -296,15 +309,6 @@ def breakTrajMat(traj_mat, k, delta):
 
 
 if __name__ == '__main__':
-
-    a = np.random.randint(0, 8, (5, 10))
-    u, s, vh = np.linalg.svd(a, full_matrices=True)
-    tmp = u[:, :6] * s
-    np.allclose(a, np.dot(tmp, vh))
-    smat = np.zeros((9, 6), dtype=complex)
-    smat[:6, :6] = np.diag(s)
-    np.allclose(a, np.dot(u, np.dot(smat, vh)))
-
     # extractImages('pen.mp4', 'extractedImgs')
     # makeVideoMask('extractedImgs')
     # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
