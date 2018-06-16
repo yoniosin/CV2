@@ -3,9 +3,13 @@ from numpy.random import permutation
 from Q3 import *
 from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
+from scipy.signal import savgol_filter
+
+Point = namedtuple('Point', ['x', 'y'])
+CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
+
 
 class Frame:
-    Point = namedtuple('Point', ['x', 'y'])
 
     def __init__(self, idx, img, reference_img):
         self.idx = idx
@@ -77,19 +81,7 @@ class Frame:
             self.feature_points_vec.append(point)
 
 
-def initChosenFeatures(corners):
-    chosen_features = np.empty((6, 3, 2), dtype=np.float32)
-
-    features_mat = [[1, 6, 13], [1, 9, 18], [1, 8, 14], [3, 10, 18], [1, 6, 13], [6, 13, 19]]
-
-    for k in range(6):
-        chosen_features[k, :, :] = corners[k][features_mat[k], :]
-
-    return chosen_features
-
-
 class SourceFrame(Frame):
-    CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
     def __init__(self, src_img, dst_img_vec):
         super().__init__(0, src_img, src_img)
@@ -101,7 +93,6 @@ class SourceFrame(Frame):
         self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.trajectories = TrajList(self.frame_vec)
-
 
     @staticmethod
     def ThrowError():
@@ -158,12 +149,13 @@ class SourceFrame(Frame):
                 else:
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
-                self.AddCoupledPoints(dst_frame_idx, self.CoupledPoints(src_point, best_point), 255 - 10 * k, k)
+                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, 255 - 10 * k)
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
 
-    def AddCoupledPoints(self, dst_frame_idx, coupled_points, color, k):
+    def AddCoupledPoints(self, dst_frame_idx, source_point, dest_point, color):
+        coupled_points = CoupledPoints(source_point, dest_point)
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
         self.ZeroPixelsInWindow(coupled_points.src_point, 10, self.frame_vec[dst_frame_idx].reference_img, color)
@@ -196,8 +188,7 @@ class SourceFrame(Frame):
                 best_M = M
                 best_iM = iM
 
-        return  best_M, best_iM
-
+        return best_M, best_iM
 
     def applyAffineTrans(self):
         rows, cols, ch = self.img.shape
@@ -220,7 +211,54 @@ class SourceFrame(Frame):
                 traj_mat[y_mat_idx, frame_idx] = trajectory[frame_idx].y
 
         return traj_mat
+
+    def smartStabilization(self, k, delta, r):
+        trajectory = self.CreateTrajectoryMat()
+        broken_mat_list = breakTrajMat(trajectory, k, delta)
+
+        svd_out = []
+        for mat in broken_mat_list:
+            u, s, vh = svd_t(mat, n_components=r)
+            c = np.matmul(u, np.diag(s))
+            e = savgol_filter(vh, 161, 1, axis=1)
+
+            new_mat = np.dot(c, e)
+            x_mat, y_mat = ExtractCoorFromM(mat)
+            x_new_mat, y_new_mat = ExtractCoorFromM(new_mat)
+
+            coupled_points = []
+            for x_coor, y_coor, new_x_coor, new_y_coor in zip(x_mat, y_mat, x_new_mat, y_new_mat):
+                original_point = Point(x_coor, y_coor)
+                smoothed_point = Point(new_x_coor, new_y_coor)
+                coupled_points.append(CoupledPoints(original_point, smoothed_point))
+
+            return coupled_points
+
+
+def ExtractCoorFromM(mat):
+    return mat[::2, :], mat[1::2, :]
+
+
+class SourceFrameError(ValueError):
+    pass
+
+
+class FrameError(ValueError):
+    pass
+
+
 ''' Aux Methods'''
+
+
+def initChosenFeatures(corners):
+    chosen_features = np.empty((6, 3, 2), dtype=np.float32)
+
+    features_mat = [[1, 6, 13], [1, 9, 18], [1, 8, 14], [3, 10, 18], [1, 6, 13], [6, 13, 19]]
+
+    for k in range(6):
+        chosen_features[k, :, :] = corners[k][features_mat[k], :]
+
+    return chosen_features
 
 
 def plotRconstImg(input_img, output, real):
@@ -262,14 +300,6 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
 #
 #     [plotRconstImg(frame, reconst) for frame, reconst in zip(frames, reconst_img_list)]
 
-class SourceFrameError(ValueError):
-    pass
-
-
-class FrameError(ValueError):
-    pass
-
-
 def section3(src_frame):
     for frame in src_frame.frame_vec:
         plt.subplot(121), plt.imshow(frame.reference_img), plt.title('reference')
@@ -277,25 +307,9 @@ def section3(src_frame):
         plt.show()
 
 
-def smartStbilization(source_frame, k, delta):
-    traj = source_frame.CreateTrajectoryMat()
-    broken_mat_list = breakTrajMat(traj, k, delta)
-    e_list = []
-    c_list = []
-    u, s, vh = svd_t(M0, n_components=r) - python
-
-    c = np.matmul(u, np.diag(s))
-    e = vh
-
-    e_stab[n, :] = filter(e[n, :])
-    (ממליץ על from scipy.signal import savgol_filter as filter)
-    M0_stab = np.matmul(c, e_stab
-
-
-
 def breakTrajMat(traj_mat, k, delta):
     mat_list = []
-    rows, cols = traj_mat.shaepe
+    rows, cols = traj_mat.shape
 
     start_frame = 0
     end_frame = delta - 1
@@ -311,18 +325,6 @@ def breakTrajMat(traj_mat, k, delta):
 
 
 if __name__ == '__main__':
-
-    a = np.random.randint(0, 8, (5, 10))
-    u, s, vh = np.linalg.svd(a, full_matrices=True)
-    tmp = u[:, :6] * s
-    np.allclose(a, np.dot(tmp, vh))
-    smat = np.zeros((9, 6), dtype=complex)
-    smat[:6, :6] = np.diag(s)
-    np.allclose(a, np.dot(u, np.dot(smat, vh)))
-
-
-
-
     # extractImages('pen.mp4', 'extractedImgs')
     # makeVideoMask('extractedImgs')
     # createVideo('extractedImgs', 'masks', 'masked_pen.avi', 30)
@@ -334,7 +336,6 @@ if __name__ == '__main__':
     frames = [cv.imread(im) for im in frames_names]
 
     source_frame = SourceFrame(frames[0], frames[1:])
-
 
     for i in range(source_frame.frame_num):
         source_frame.AutomaticMatch(i, 100, 40)
