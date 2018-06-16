@@ -5,9 +5,11 @@ from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
 from scipy.signal import savgol_filter
 
+Point = namedtuple('Point', ['x', 'y'])
+CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
+
 
 class Frame:
-    Point = namedtuple('Point', ['x', 'y'])
 
     def __init__(self, idx, img, reference_img):
         self.idx = idx
@@ -80,7 +82,6 @@ class Frame:
 
 
 class SourceFrame(Frame):
-    CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
     def __init__(self, src_img, dst_img_vec):
         super().__init__(0, src_img, src_img)
@@ -147,12 +148,13 @@ class SourceFrame(Frame):
                 else:
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
-                self.AddCoupledPoints(dst_frame_idx, self.CoupledPoints(src_point, best_point), 255 - 10 * k, k)
+                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, 255 - 10 * k)
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
 
-    def AddCoupledPoints(self, dst_frame_idx, coupled_points, color, k):
+    def AddCoupledPoints(self, dst_frame_idx, source_point, dest_point, color):
+        coupled_points = CoupledPoints(source_point, dest_point)
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
         self.ZeroPixelsInWindow(coupled_points.src_point, 10, self.frame_vec[dst_frame_idx].reference_img, color)
@@ -216,8 +218,20 @@ class SourceFrame(Frame):
             e = savgol_filter(vh, 161, 1, axis=1)
 
             new_mat = np.dot(c, e)
-            svd_out.append(SVD_Res(mat, new_mat))
+            x_mat, y_mat = ExtractCoorFromM(mat)
+            x_new_mat, y_new_mat = ExtractCoorFromM(new_mat)
 
+            coupled_points = []
+            for x_coor, y_coor, new_x_coor, new_y_coor in zip(x_mat, y_mat, x_new_mat, y_new_mat):
+                original_point = Point(x_coor, y_coor)
+                smoothed_point = Point(new_x_coor, new_y_coor)
+                coupled_points.append(CoupledPoints(original_point, smoothed_point))
+
+            return coupled_points
+
+
+def ExtractCoorFromM(mat):
+    return mat[::2, :], mat[1::2, :]
 
 
 class SourceFrameError(ValueError):
@@ -286,9 +300,6 @@ def section3(src_frame):
         plt.subplot(121), plt.imshow(frame.reference_img), plt.title('reference')
         plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
         plt.show()
-
-
-SVD_Res = namedtuple('SVD_Res', ['Original', 'Smoothed'])
 
 
 def breakTrajMat(traj_mat, k, delta):
