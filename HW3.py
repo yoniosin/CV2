@@ -223,7 +223,7 @@ class SourceFrame(Frame):
             e = np.zeros((r, k))
 
             for m in range(r):
-                e[m, :] = savgol_filter(vh[m, :], 49, 1)
+                e[m, :] = savgol_filter(vh[m, :], 5, 1)
 
             max_window = delta if mat_num < len(broken_mat_list) - 1 else k
             new_mat = np.dot(c, e)[:, :max_window]
@@ -238,12 +238,12 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                _, inv_affine_mat = self.RANSAC(coupled_points, 10, 5)
+                _, inv_affine_mat = self.RANSAC(coupled_points, 30, 1)
 
                 frame_idx = mat_num * delta + column_idx
                 inv_affine_mat_dict[frame_idx] = inv_affine_mat
 
-        self.inv_affine_mat = inv_affine_mat_dict
+        self.affine_inv_mat = inv_affine_mat_dict
 
 
 def ExtractCoorFromM(mat):
@@ -365,11 +365,11 @@ if __name__ == '__main__':
     #     output = source_frame.affine_imgs[i]
     #     plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
     #
-    for i in range(source_frame.frame_num):
-        output = source_frame.inv_affine_imgs[i]
-        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
+    # for i in range(source_frame.frame_num):
+    #     output = source_frame.inv_affine_imgs[i]
+    #     plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
 
     stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(source_frame.frame_num)]
-    createVideoFromList(stabilized_img, 'stabi.avi', 20)
+    createVideoFromList(stabilized_img, 'smart_stabi.avi', 20)
 
     print('all done')
