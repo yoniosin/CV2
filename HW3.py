@@ -345,7 +345,12 @@ def section2(data_set):
 
 
 def section6(data_set):
-    for frame in data_set.frame_vec[::20]
+    for frame in data_set.frame_vec[::20]:
+        plt.figure()
+        plt.subplot(121), plt.imshow(frame.reference_img)
+        plt.subplot(122), plt.imshow(frame.img)
+        plt.show()
+
 
 if __name__ == '__main__':
     # create data-set
