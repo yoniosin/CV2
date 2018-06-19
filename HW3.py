@@ -5,7 +5,6 @@ from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
 from scipy.signal import savgol_filter
 
-Point = namedtuple('Point', ['x', 'y'])
 CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
 
@@ -55,8 +54,11 @@ class Frame:
 
     @staticmethod
     def CalculateSSD(a, b):
-        tmp = np.linalg.norm(np.linalg.norm((a - b), 2, 2), 1)
-        return tmp
+        a = a.astype(int)
+        b = b.astype(int)
+        sub = a - b
+        pixel_norm = np.linalg.norm(sub, axis=2)
+        return np.sum(pixel_norm)
 
     @staticmethod
     def applyAffineTransPerPoint(source_point, M):
@@ -231,7 +233,7 @@ class SourceFrame(Frame):
             e = np.zeros((r, k))
 
             for m in range(r):
-                e[m, :] = savgol_filter(vh[m, :], 5, 1)
+                e[m, :] = savgol_filter(vh[m, :], 21, 1)
 
             max_window = delta if mat_num < len(broken_mat_list) - 1 else k
             new_mat = np.dot(c, e)[:, :max_window]
@@ -246,7 +248,7 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                _, inv_affine_mat = self.RANSAC(coupled_points, 30, 1)
+                _, inv_affine_mat = self.RANSAC(coupled_points)
 
                 frame_idx = mat_num * delta + column_idx
                 inv_affine_mat_dict[frame_idx] = inv_affine_mat
@@ -378,7 +380,7 @@ def Manual(data_set):
 def section6(data_set):
     # perform automatic match for all frames
     for i in range(source_frame.frame_num):
-        source_frame.AutomaticMatch(i, 40, 10)
+        source_frame.AutomaticMatch(i, 100, 50)
 
     # plot the pair images of the reference image and each of the frames with relevant matched points
     for frame in data_set.frame_vec[::20]:
@@ -419,7 +421,7 @@ def section9(data_set):
 
 if __name__ == '__main__':
     # extract the images fro video to frames
-    # extractImages('inv.mp4', 'extractedImgs')
+    extractImages('inv.mp4', 'extractedImgs')
 
     # create data-set
     frames_num = list(range(151))
@@ -429,10 +431,10 @@ if __name__ == '__main__':
 
     # Manual(source_frame)
 
-    #section2(source_frame)
-    section6(source_frame)
-    section7(source_frame)
-    section8(source_frame)
+    # section2(source_frame)
+    # section6(source_frame)
+    # section7(source_frame)
+    # section8(source_frame)
     section9(source_frame)
 
     print('all done')

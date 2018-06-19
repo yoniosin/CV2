@@ -2,17 +2,18 @@ import cv2
 import numpy as np
 from collections import namedtuple
 
+Point = namedtuple('Point', ['x', 'y'])
+
 
 class TrajList:
-    Point = namedtuple('Point', ['x', 'y'])
 
     def __init__(self, frames_vec):
         self.trajectory_list = []
         self.klt(frames_vec)
 
     def addTrajPoint(self, frame_idx, p0, p1):
-        p0 = self.Point(p0[0, 1], p0[0, 0])
-        p1 = self.Point(p1[0, 1], p1[0, 0])
+        p0 = Point(p0[0, 1], p0[0, 0])
+        p1 = Point(p1[0, 1], p1[0, 0])
         for trajectory in self.trajectory_list:
             if (frame_idx - 1) in trajectory.keys() and trajectory[frame_idx - 1] == p0:
                 trajectory[frame_idx] = p1
@@ -21,8 +22,8 @@ class TrajList:
         raise ValueError
 
     def addNewTraj(self, frame_idx, p0, p1):
-        p0 = self.Point(p0[0, 1], p0[0, 0])
-        p1 = self.Point(p1[0, 1], p1[0, 0])
+        p0 = Point(p0[0, 1], p0[0, 0])
+        p1 = Point(p1[0, 1], p1[0, 0])
         self.trajectory_list.append({frame_idx - 1: p0, frame_idx: p1})
 
     @staticmethod
@@ -43,13 +44,10 @@ class TrajList:
                          maxLevel=2,
                          criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
         # Create some random colors
-        color = np.random.randint(0, 255, (100, 3))
         # Take first frame and find corners in it
         old_frame = frame_vec[0].img
         old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
         p0 = cv2.goodFeaturesToTrack(old_gray, mask=None, **feature_params)
-        last_new_point = np.ones(len(p0))
-        points_num = 0
 
         for frame_idx in range(1, len(frame_vec)):
             frame = frame_vec[frame_idx].img
