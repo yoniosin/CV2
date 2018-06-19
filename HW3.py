@@ -61,7 +61,7 @@ class Frame:
 
     @staticmethod
     def applyAffineTransPerPoint(source_point, M):
-        return np.dot(M[:, :2], np.asarray([source_point.x, source_point.y])) + M[:, -1]
+        return M[:, :2] @ np.asarray([source_point.x, source_point.y]) + M[:, 2]
 
     def cornerDetector(self):
         gray = cv.cvtColor(self.img, cv.COLOR_BGR2GRAY)
@@ -107,8 +107,8 @@ class SourceFrame(Frame):
         reference_pts = np.zeros((3, 2), dtype=np.float32)
         shifted_pts = np.zeros((3, 2), dtype=np.float32)
         for k, selected_idx in enumerate(selected_idx_vec):
-            reference_pts[k, :] = np.round(coupled_points_list[selected_idx].src_point)
-            shifted_pts[k, :] = np.round(coupled_points_list[selected_idx].dst_point)
+            reference_pts[k, :] = coupled_points_list[selected_idx].src_point
+            shifted_pts[k, :] = coupled_points_list[selected_idx].dst_point
 
         M = cv.getAffineTransform(reference_pts, shifted_pts)
         iM = np.zeros(M.shape)
@@ -199,7 +199,7 @@ class SourceFrame(Frame):
         return best_M, best_iM
 
     def applyAffineTransForAllFrames(self):
-        rows, cols, ch = self.img.shape
+        rows, cols, _ = self.img.shape
         affine_imgs = []
         for k in range(self.frame_num):
             affine_imgs.append(cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
@@ -230,7 +230,7 @@ class SourceFrame(Frame):
     def smartStabilization(self, k, delta, r):
         trajectory = self.CreateTrajectoryMat()
         broken_mat_list = breakTrajMat(trajectory, k, delta)
-        inv_affine_mat_dict = {}
+        affine_mat_dict = {}
 
         for mat_num, mat in enumerate(broken_mat_list):
             u, s, vh = np.linalg.svd(mat)
@@ -259,12 +259,12 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                _, inv_affine_mat = self.RANSAC(coupled_points, 100, 0.5)
+                affine_mat, _ = self.RANSAC(coupled_points, 100, 0.5)
 
                 frame_idx = mat_num * delta + column_idx
-                inv_affine_mat_dict[frame_idx] = inv_affine_mat
+                affine_mat_dict[frame_idx] = affine_mat
 
-        self.affine_inv_mat = inv_affine_mat_dict
+        self.affine_mat = affine_mat_dict
 
 
 def ExtractCoorFromM(mat):
@@ -302,7 +302,7 @@ def plotRconstImg(input_img, output, real, idx):
 
 
 def calcEuclideanDist(estimated_points_list, real_points_list):
-    dist_list = [np.linalg.norm(estimated_point - real_point, 2) for estimated_point, real_point in
+    dist_list = [np.linalg.norm(estimated_point - real_point) for estimated_point, real_point in
                  zip(estimated_points_list, real_points_list)]
     return np.asarray(dist_list)
 
@@ -318,7 +318,7 @@ def breakTrajMat(traj_mat, k, delta):
         start_frame += delta
         end_frame += delta
 
-        new_mat[(new_mat != 0).all(axis=1)]
+        new_mat = new_mat[(new_mat != 0).all(axis=1)]
         mat_list.append(new_mat)
 
     return mat_list
@@ -386,18 +386,13 @@ def section8(data_set):
         plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
 
     stabilized_img = [inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 20)
+    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 30)
 
 
 def section9(data_set):
     data_set.smartStabilization(50, 1, 9)
-    inv_affine_imgs = data_set.applyInvAffineTransForAllFrames()
-
-    for i in range(0, source_frame.frame_num, 20):
-        plotRconstImg(source_frame.frame_vec[i].img, inv_affine_imgs[i], source_frame.img, i)
-
-    smart_stabilized_img = [inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 20)
+    tmp = data_set.applyAffineTransForAllFrames()
+    createVideoFromList(tmp, 'smart_stabilized_vid.avi', 30)
 
 
 if __name__ == '__main__':
