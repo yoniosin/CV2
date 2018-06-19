@@ -3,7 +3,8 @@ from numpy.random import permutation
 from Q3 import *
 from klt import *
 from sklearn.utils.extmath import randomized_svd as svd_t
-from scipy.signal import savgol_filter
+# from scipy.signal import savgol_filter
+from scipy import ndimage
 
 CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
@@ -21,8 +22,6 @@ class Frame:
         for point in self.feature_points_vec:
             color = np.random.randint(0, 255, (1, 3))
             self.ZeroPixelsInWindow(point, 5, self.img_with_harris, color)
-
-        self.manual_matching_mat = np.zeros((3, 2))
 
     def ZeroPixelsInWindow(self, center, window_size, img, color):
         try:
@@ -228,17 +227,23 @@ class SourceFrame(Frame):
         inv_affine_mat_dict = {}
 
         for mat_num, mat in enumerate(broken_mat_list):
-            u, s, vh = svd_t(mat, n_components=r)
-            c = np.matmul(u, np.diag(s))
-            e = np.zeros((r, k))
+            u, s, vh = np.linalg.svd(mat)
 
-            for m in range(r):
-                e[m, :] = savgol_filter(vh[m, :], 21, 1)
+            u = u[:,:r]
+            s = s[:r]
+            vh = vh[:r,:]
+
+            c = u @ np.diag(np.sqrt(s))
+            e = np.diag(np.sqrt(s)) @ vh
+
+            sigma = k / (np.sqrt(2))
+            # sigma = 35
+            e = ndimage.gaussian_filter(e, (0, sigma))
 
             max_window = delta if mat_num < len(broken_mat_list) - 1 else k
-            new_mat = np.dot(c, e)[:, :max_window]
+            new_mat = c @ e
             x_mat, y_mat = ExtractCoorFromM(mat[:, :max_window])
-            x_new_mat, y_new_mat = ExtractCoorFromM(new_mat)
+            x_new_mat, y_new_mat = ExtractCoorFromM(new_mat[:, :max_window])
 
             for column_idx, (x_column, y_column, new_x_column, new_y_column) in \
                     enumerate(zip(x_mat.T, y_mat.T, x_new_mat.T, y_new_mat.T)):
@@ -248,7 +253,7 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                _, inv_affine_mat = self.RANSAC(coupled_points)
+                _, inv_affine_mat = self.RANSAC(coupled_points, 100, 0.5)
 
                 frame_idx = mat_num * delta + column_idx
                 inv_affine_mat_dict[frame_idx] = inv_affine_mat
@@ -329,7 +334,7 @@ def breakTrajMat(traj_mat, k, delta):
 
     start_frame = 0
     end_frame = k - 1
-    while end_frame <= cols:
+    while end_frame < cols:
         new_mat = traj_mat[:, range(start_frame, end_frame + 1)]
         start_frame += delta
         end_frame += delta
@@ -404,11 +409,11 @@ def section8(data_set):
         plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
 
     stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 20)
+    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 30)
 
 
 def section9(data_set):
-    data_set.smartStabilization(50, 5, 9)
+    data_set.smartStabilization(50, 1, 9)
     data_set.applyInvAffineTransForAllFrames()
 
     for i in range(0, source_frame.frame_num, 20):
@@ -416,12 +421,12 @@ def section9(data_set):
         plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
 
     smart_stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 20)
+    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 30)
 
 
 if __name__ == '__main__':
     # extract the images fro video to frames
-    extractImages('inv.mp4', 'extractedImgs')
+    # extractImages('sugar.mp4', 'extractedImgs')
 
     # create data-set
     frames_num = list(range(151))
