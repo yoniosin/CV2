@@ -18,11 +18,6 @@ class Frame:
         self.reference_img = reference_img
         self.cornerDetector()
 
-        # self.img_with_harris = np.copy(self.img)
-        # for point in self.feature_points_vec:
-        #     color = np.random.randint(0, 255, (1, 3))
-        #     self.ZeroPixelsInWindow(point, 5, self.img_with_harris, color)
-
     def ZeroPixelsInWindow(self, center, window_size, img, color):
         try:
             x_idx_vec, y_idx_vec = self.GetIndexes(center, window_size)
@@ -325,9 +320,15 @@ def breakTrajMat(traj_mat, k, delta):
 
 
 def section2(data_set):
+
     for frame in data_set.frame_vec[::20]:
+        img_with_harris = np.copy(frame.img)
+        for point in frame.feature_points_vec:
+            color = np.random.randint(0, 255, (1, 3))
+            frame.ZeroPixelsInWindow(point, 5, img_with_harris, color)
+
         plt.figure()
-        plt.imshow(frame.img_with_harris)
+        plt.imshow(img_with_harris)
         plt.title('Frame #' + str(frame.idx) + ' Corners Detected using Harris')
         plt.show()
 
