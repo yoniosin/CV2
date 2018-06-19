@@ -19,11 +19,6 @@ class TrajList:
                 trajectory[frame_idx] = p1
                 return
 
-        raise ValueError
-
-    def addNewTraj(self, frame_idx, p0, p1):
-        p0 = Point(p0[0, 1], p0[0, 0])
-        p1 = Point(p1[0, 1], p1[0, 0])
         self.trajectory_list.append({frame_idx - 1: p0, frame_idx: p1})
 
     @staticmethod
@@ -56,10 +51,7 @@ class TrajList:
             p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
 
             for st_idx in np.where(st == 1)[0]:
-                try:
-                    self.addTrajPoint(frame_idx, p0[st_idx], p1[st_idx])
-                except ValueError:
-                    self.addNewTraj(frame_idx, p0[st_idx], p1[st_idx])
+                self.addTrajPoint(frame_idx, p0[st_idx], p1[st_idx])
 
             # Now update the previous frame and previous points
             old_gray = frame_gray.copy()

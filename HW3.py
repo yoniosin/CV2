@@ -18,10 +18,10 @@ class Frame:
         self.reference_img = reference_img
         self.cornerDetector()
 
-        self.img_with_harris = np.copy(self.img)
-        for point in self.feature_points_vec:
-            color = np.random.randint(0, 255, (1, 3))
-            self.ZeroPixelsInWindow(point, 5, self.img_with_harris, color)
+        # self.img_with_harris = np.copy(self.img)
+        # for point in self.feature_points_vec:
+        #     color = np.random.randint(0, 255, (1, 3))
+        #     self.ZeroPixelsInWindow(point, 5, self.img_with_harris, color)
 
     def ZeroPixelsInWindow(self, center, window_size, img, color):
         try:
@@ -94,8 +94,8 @@ class SourceFrame(Frame):
         self.coupled_points = {k: [] for k in range(self.frame_num)}
         self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
         self.affine_inv_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
-        self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
-        self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
+        # self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
+        # self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.trajectories = TrajList(self.frame_vec)
 
     @staticmethod
@@ -200,14 +200,20 @@ class SourceFrame(Frame):
 
     def applyAffineTransForAllFrames(self):
         rows, cols, ch = self.img.shape
+        affine_imgs = []
         for k in range(self.frame_num):
-            self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
+            affine_imgs.append(cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
+
+        return affine_imgs
 
     def applyInvAffineTransForAllFrames(self, frame_list=None):
         rows, cols, ch = self.img.shape
         frame_list_real = range(self.frame_num) if frame_list is None else frame_list
+        inv_affine_imgs = []
         for k in frame_list_real:
-            self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
+            inv_affine_imgs.append(cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
+
+        return inv_affine_imgs
 
     def CreateTrajectoryMat(self):
         trajectories_list = self.trajectories.trajectory_list
@@ -229,9 +235,9 @@ class SourceFrame(Frame):
         for mat_num, mat in enumerate(broken_mat_list):
             u, s, vh = np.linalg.svd(mat)
 
-            u = u[:,:r]
+            u = u[:, :r]
             s = s[:r]
-            vh = vh[:r,:]
+            vh = vh[:r, :]
 
             c = u @ np.diag(np.sqrt(s))
             e = np.diag(np.sqrt(s)) @ vh
@@ -301,33 +307,6 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
     return np.asarray(dist_list)
 
 
-# def reconstractImgs(chosen_features, list_of_frames):
-#     reference_pts = chosen_features[0, :, :]
-#
-#     rows, cols, ch = list_of_frames[0].shape
-#     M_list = []
-#     iM_list = []
-#     reconst_img = []
-#
-#     for i in range(1, len(list_of_frames)):
-#         shifted_pts = chosen_features[i, :, :]
-#         M, iM = self.calcAffineTrans(reference_pts, shifted_pts)
-#         M_list.append(M)
-#         iM_list.append(iM)
-#         reconst_img.append(cv.warpAffine(frames[i], iM, (cols, rows)))
-#
-#     return reconst_img
-
-
-# def ManualMatching():
-#     corners = [cornerDetector(img) for img in frames]
-#
-#     chosen_features = initChosenFeatures(corners)
-#     reconst_img_list = reconstractImgs(chosen_features, frames)
-#
-#     [plotRconstImg(frame, reconst) for frame, reconst in zip(frames, reconst_img_list)]
-
-
 def breakTrajMat(traj_mat, k, delta):
     mat_list = []
     rows, cols = traj_mat.shape
@@ -372,12 +351,10 @@ def Manual(data_set):
 
         data_set.affine_inv_mat[frame_idx] = iM
 
-        data_set.applyInvAffineTransForAllFrames([0, 20, 40, 60, 80, 100, 120])
+    output = data_set.applyInvAffineTransForAllFrames([0, 20, 40, 60, 80, 100, 120])
 
-    output = []
-    for i in range(20, data_set.frame_num, 20):
-        output.append(data_set.inv_affine_imgs[i])
-        plotRconstImg(data_set.frame_vec[i].img, data_set.inv_affine_imgs[i], data_set.img, i)
+    for i in range(0, data_set.frame_num, 20):
+        plotRconstImg(data_set.frame_vec[i].img, output[i], data_set.img, i)
 
     createVideoFromList(output, 'manual_stabilized.avi', 2)
 
@@ -402,31 +379,30 @@ def section7(data_set):
 
 
 def section8(data_set):
-    data_set.applyInvAffineTransForAllFrames()
+    inv_affine_imgs = data_set.applyInvAffineTransForAllFrames()
 
     for i in range(0, source_frame.frame_num, 20):
         output = source_frame.inv_affine_imgs[i]
         plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
 
-    stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 30)
+    stabilized_img = [inv_affine_imgs[i] for i in range(data_set.frame_num)]
+    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 20)
 
 
 def section9(data_set):
     data_set.smartStabilization(50, 1, 9)
-    data_set.applyInvAffineTransForAllFrames()
+    inv_affine_imgs = data_set.applyInvAffineTransForAllFrames()
 
     for i in range(0, source_frame.frame_num, 20):
-        output = source_frame.inv_affine_imgs[i]
-        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
+        plotRconstImg(source_frame.frame_vec[i].img, inv_affine_imgs[i], source_frame.img, i)
 
-    smart_stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
-    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 30)
+    smart_stabilized_img = [inv_affine_imgs[i] for i in range(data_set.frame_num)]
+    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 20)
 
 
 if __name__ == '__main__':
     # extract the images fro video to frames
-    # extractImages('sugar.mp4', 'extractedImgs')
+    extractImages('sugar.mp4', 'extractedImgs')
 
     # create data-set
     frames_num = list(range(151))
