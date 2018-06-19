@@ -2,8 +2,6 @@ import matplotlib.pyplot as plt
 from numpy.random import permutation
 from Q3 import *
 from klt import *
-from sklearn.utils.extmath import randomized_svd as svd_t
-# from scipy.signal import savgol_filter
 from scipy import ndimage
 
 CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
@@ -15,7 +13,6 @@ class Frame:
         self.idx = idx
         self.img = img
         self.feature_points_vec = []
-        self.reference_img = reference_img
         self.cornerDetector()
 
     def ZeroPixelsInWindow(self, center, window_size, img, color):
@@ -89,8 +86,6 @@ class SourceFrame(Frame):
         self.coupled_points = {k: [] for k in range(self.frame_num)}
         self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
         self.affine_inv_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
-        # self.inv_affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
-        # self.affine_imgs = {k: np.empty(src_img.shape) for k in range(self.frame_num)}
         self.trajectories = TrajList(self.frame_vec)
 
     @staticmethod
@@ -150,7 +145,7 @@ class SourceFrame(Frame):
                 else:
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
-                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, k)
+                self.AddCoupledPoints(dst_frame_idx, src_point, best_point)
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
@@ -158,11 +153,6 @@ class SourceFrame(Frame):
     def AddCoupledPoints(self, dst_frame_idx, source_point, dest_point, pnt_num):
         coupled_points = CoupledPoints(source_point, dest_point)
         self.coupled_points[dst_frame_idx].append(coupled_points)
-
-        if pnt_num < 10:
-            color = np.random.randint(0, 255, (1, 3))
-            self.ZeroPixelsInWindow(coupled_points.src_point, 5, self.frame_vec[dst_frame_idx].reference_img, color)
-            self.ZeroPixelsInWindow(coupled_points.dst_point, 5, self.frame_vec[dst_frame_idx].img, color)
 
     def runRANSACForFrame(self, dst_frame_idx):
         coupled_points_list = self.coupled_points[dst_frame_idx]
@@ -320,7 +310,6 @@ def breakTrajMat(traj_mat, k, delta):
 
 
 def section2(data_set):
-
     for frame in data_set.frame_vec[::20]:
         img_with_harris = np.copy(frame.img)
         for point in frame.feature_points_vec:
@@ -362,15 +351,22 @@ def Manual(data_set):
 
 def section6(data_set):
     # perform automatic match for all frames
-    for i in range(source_frame.frame_num):
-        source_frame.AutomaticMatch(i, 100, 50)
+    for frame in data_set.frame_vec:
+        source_frame.AutomaticMatch(frame.idx, 100, 50)
 
     # plot the pair images of the reference image and each of the frames with relevant matched points
-    for frame in data_set.frame_vec[::20]:
-        plt.figure()
-        plt.subplot(121), plt.imshow(frame.reference_img), plt.title('Automatic matched points - reference image')
-        plt.subplot(122), plt.imshow(frame.img), plt.title('Frame #' + str(frame.idx))
-        plt.show()
+        dst_img_disp = np.copy(frame.img)
+        ref_img_disp = np.copy(data_set.img)
+        for coupled_points in data_set.coupled_points[:10]:
+            color = np.random.randint(0, 255, (1, 3))
+            data_set.ZeroPixelsInWindow(coupled_points.src_point, 5, ref_img_disp, color)
+            data_set.ZeroPixelsInWindow(coupled_points.dst_point, 5, dst_img_disp, color)
+
+        if frame.idx % 20 == 0:
+            plt.figure()
+            plt.subplot(121), plt.imshow(ref_img_disp), plt.title('Automatic matched points - reference image')
+            plt.subplot(122), plt.imshow(dst_img_disp), plt.title('Frame #' + str(frame.idx))
+            plt.show()
 
 
 def section7(data_set):
