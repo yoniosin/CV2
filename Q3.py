@@ -67,6 +67,7 @@ def createVideoFromList(image_list, video_name, fps):
     video = cv.VideoWriter(video_name, fourcc, fps, (width, height))
 
     for image in image_list:
+        image = image[:, :, ::-1]
         video.write(image)
 
     cv.destroyAllWindows()

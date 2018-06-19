@@ -18,9 +18,12 @@ class Frame:
         self.reference_img = reference_img
         self.cornerDetector()
 
-        self.img_with_harris = self.img
+        self.img_with_harris = np.copy(self.img)
         for point in self.feature_points_vec:
-            self.ZeroPixelsInWindow(point, 10, self.img_with_harris, 255)
+            color = np.random.randint(0, 255, (1, 3))
+            self.ZeroPixelsInWindow(point, 5, self.img_with_harris, color)
+
+        self.manual_matching_mat = np.zeros((3, 2))
 
     def ZeroPixelsInWindow(self, center, window_size, img, color):
         try:
@@ -29,7 +32,7 @@ class Frame:
             return
         for x_idx in x_idx_vec:
             for y_idx in y_idx_vec:
-                img[y_idx, x_idx] = color
+                img[y_idx, x_idx] = np.uint8(color)
 
     @staticmethod
     def ThrowError():
@@ -85,7 +88,7 @@ class SourceFrame(Frame):
 
     def __init__(self, src_img, dst_img_vec):
         super().__init__(0, src_img, src_img)
-        self.frame_vec = [Frame(k, pic, src_img) for k, pic in enumerate(dst_img_vec)]
+        self.frame_vec = [Frame(k, pic, np.copy(src_img)) for k, pic in enumerate(dst_img_vec)]
         self.frame_num = len(self.frame_vec)
         self.coupled_points = {k: [] for k in range(self.frame_num)}
         self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
@@ -132,8 +135,10 @@ class SourceFrame(Frame):
             except FrameError:
                 dst_frame.feature_points_vec.remove(dst_point)
                 continue
-
-        return potential_point_vec[np.argmin([ssd_vec])]
+        try:
+            return potential_point_vec[np.argmin([ssd_vec])]
+        except ValueError:
+            raise SourceFrameError
 
     def AutomaticMatch(self, dst_frame_idx, L, W):
         dst_frame = self.frame_vec[dst_frame_idx]
@@ -149,18 +154,19 @@ class SourceFrame(Frame):
                 else:
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
-                color = color = np.random.randint(0,255,(100,3))
-                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, color)
+                self.AddCoupledPoints(dst_frame_idx, src_point, best_point, k)
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
 
-    def AddCoupledPoints(self, dst_frame_idx, source_point, dest_point, color):
+    def AddCoupledPoints(self, dst_frame_idx, source_point, dest_point, pnt_num):
         coupled_points = CoupledPoints(source_point, dest_point)
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
-        self.ZeroPixelsInWindow(coupled_points.src_point, 10, self.frame_vec[dst_frame_idx].reference_img, color)
-        self.ZeroPixelsInWindow(coupled_points.dst_point, 10, self.frame_vec[dst_frame_idx].img, color)
+        if pnt_num < 10:
+            color = np.random.randint(0, 255, (1, 3))
+            self.ZeroPixelsInWindow(coupled_points.src_point, 5, self.frame_vec[dst_frame_idx].reference_img, color)
+            self.ZeroPixelsInWindow(coupled_points.dst_point, 5, self.frame_vec[dst_frame_idx].img, color)
 
     def runRANSACForFrame(self, dst_frame_idx):
         coupled_points_list = self.coupled_points[dst_frame_idx]
@@ -169,7 +175,7 @@ class SourceFrame(Frame):
         self.affine_mat[dst_frame_idx] = best_M
         self.affine_inv_mat[dst_frame_idx] = best_iM
 
-    def RANSAC(self, coupled_points_list, iter_num=100, thresh=30):
+    def RANSAC(self, coupled_points_list, iter_num=100, thresh=15):
         biggest_inlier = []
         best_M = np.empty((2, 3))
         best_iM = np.empty((2, 3))
@@ -196,9 +202,10 @@ class SourceFrame(Frame):
         for k in range(self.frame_num):
             self.affine_imgs[k] = (cv.warpAffine(self.img, self.affine_mat[k], (cols, rows)))
 
-    def applyInvAffineTransForAllFrames(self):
+    def applyInvAffineTransForAllFrames(self, frame_list=None):
         rows, cols, ch = self.img.shape
-        for k in range(self.frame_num):
+        frame_list_real = range(self.frame_num) if frame_list is None else frame_list
+        for k in frame_list_real:
             self.inv_affine_imgs[k] = (cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
 
     def CreateTrajectoryMat(self):
@@ -273,8 +280,9 @@ def initChosenFeatures(corners):
     return chosen_features
 
 
-def plotRconstImg(input_img, output, real):
-    plt.subplot(131), plt.imshow(input_img), plt.title('frame')
+def plotRconstImg(input_img, output, real, idx):
+    plt.figure()
+    plt.subplot(131), plt.imshow(input_img), plt.title('frame #' + str(idx))
     plt.subplot(132), plt.imshow(output), plt.title('trans frame')
     plt.subplot(133), plt.imshow(real), plt.title('reference')
     plt.show()
@@ -312,12 +320,6 @@ def calcEuclideanDist(estimated_points_list, real_points_list):
 #
 #     [plotRconstImg(frame, reconst) for frame, reconst in zip(frames, reconst_img_list)]
 
-def section3(src_frame):
-    for frame in src_frame.frame_vec:
-        plt.subplot(121), plt.imshow(frame.reference_img), plt.title('reference')
-        plt.subplot(122), plt.imshow(frame.img), plt.title('frame')
-        plt.show()
-
 
 def breakTrajMat(traj_mat, k, delta):
     mat_list = []
@@ -340,49 +342,97 @@ def section2(data_set):
     for frame in data_set.frame_vec[::20]:
         plt.figure()
         plt.imshow(frame.img_with_harris)
-        plt.title('Frame #' + str(frame.idx) + 'Corners Detected using Harris')
+        plt.title('Frame #' + str(frame.idx) + ' Corners Detected using Harris')
         plt.show()
+
+
+def Manual(data_set):
+    ref_point_list = [Point(171, 32), Point(484, 53), Point(194, 170)]
+    dst_point_dict = {20: [Point(169, 52), Point(480, 65), Point(194, 184)],
+                      40: [Point(205, 78), Point(513, 79), Point(233, 205)],
+                      60: [Point(188, 56), Point(488, 68), Point(211, 182)],
+                      80: [Point(160, 34), Point(462, 55), Point(184, 165)],
+                      100: [Point(219, 25), Point(517, 38), Point(241, 153)],
+                      120: [Point(190, 74), Point(491, 84), Point(217, 202)],
+                      }
+
+    for frame_idx in dst_point_dict.keys():
+        dst_point_list = dst_point_dict[frame_idx]
+        coupled_points = [CoupledPoints(ref_point, dst_point) for ref_point, dst_point
+                          in zip(ref_point_list, dst_point_list)]
+
+        M, iM = data_set.calcAffineTrans(coupled_points, [0, 1, 2])
+
+        data_set.affine_inv_mat[frame_idx] = iM
+
+        data_set.applyInvAffineTransForAllFrames([0, 20, 40, 60, 80, 100, 120])
+
+    output = []
+    for i in range(20, data_set.frame_num, 20):
+        output.append(data_set.inv_affine_imgs[i])
+        plotRconstImg(data_set.frame_vec[i].img, data_set.inv_affine_imgs[i], data_set.img, i)
+
+    createVideoFromList(output, 'manual_stabilized.avi', 2)
 
 
 def section6(data_set):
+    # perform automatic match for all frames
+    for i in range(source_frame.frame_num):
+        source_frame.AutomaticMatch(i, 40, 10)
+
+    # plot the pair images of the reference image and each of the frames with relevant matched points
     for frame in data_set.frame_vec[::20]:
         plt.figure()
-        plt.subplot(121), plt.imshow(frame.reference_img)
-        plt.subplot(122), plt.imshow(frame.img)
+        plt.subplot(121), plt.imshow(frame.reference_img), plt.title('Automatic matched points - reference image')
+        plt.subplot(122), plt.imshow(frame.img), plt.title('Frame #' + str(frame.idx))
         plt.show()
 
 
+def section7(data_set):
+    # perform automatic match for all frames
+    for i in range(source_frame.frame_num):
+        data_set.runRANSACForFrame(i)
+
+
+def section8(data_set):
+    data_set.applyInvAffineTransForAllFrames()
+
+    for i in range(0, source_frame.frame_num, 20):
+        output = source_frame.inv_affine_imgs[i]
+        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
+
+    stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
+    createVideoFromList(stabilized_img, 'stabilized_vid.avi', 20)
+
+
+def section9(data_set):
+    data_set.smartStabilization(50, 5, 9)
+    data_set.applyInvAffineTransForAllFrames()
+
+    for i in range(0, source_frame.frame_num, 20):
+        output = source_frame.inv_affine_imgs[i]
+        plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img, i)
+
+    smart_stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(data_set.frame_num)]
+    createVideoFromList(smart_stabilized_img, 'smart_stabilized_vid.avi', 20)
+
+
 if __name__ == '__main__':
+    # extract the images fro video to frames
+    # extractImages('inv.mp4', 'extractedImgs')
+
     # create data-set
     frames_num = list(range(151))
     frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
-    frames = [cv.imread(im) for im in frames_names]
+    frames = [cv.imread(im)[:, :, ::-1] for im in frames_names]
     source_frame = SourceFrame(frames[0], frames[1:])
 
-    section2(source_frame)
-    # source_frame.smartStabilization(50, 5, 9)
-    # source_frame.applyInvAffineTransForAllFrames()
+    # Manual(source_frame)
 
-
-
-    # for i in range(source_frame.frame_num):
-    #     source_frame.AutomaticMatch(i, 100, 40)
-    #     source_frame.runRANSACForFrame(i)
-
-    # section3(source_frame)
-
-    source_frame.applyAffineTransForAllFrames()
-    source_frame.applyInvAffineTransForAllFrames()
-
-    # for i in range(source_frame.frame_num):
-    #     output = source_frame.affine_imgs[i]
-    #     plotRconstImg(source_frame.img, output, source_frame.frame_vec[i].img)
-    #
-    # for i in range(source_frame.frame_num):
-    #     output = source_frame.inv_affine_imgs[i]
-    #     plotRconstImg(source_frame.frame_vec[i].img, output, source_frame.img)
-
-    stabilized_img = [source_frame.inv_affine_imgs[i] for i in range(source_frame.frame_num)]
-    createVideoFromList(stabilized_img, 'smart_stabi.avi', 20)
+    #section2(source_frame)
+    section6(source_frame)
+    section7(source_frame)
+    section8(source_frame)
+    section9(source_frame)
 
     print('all done')
