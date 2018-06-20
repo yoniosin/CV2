@@ -10,8 +10,8 @@ CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
 
 class Frame:
-
-    def __init__(self, idx, img, reference_img):
+    # Frame class, calculate the feature_points_vec by cornerDetector()
+    def __init__(self, idx, img):
         self.idx = idx
         self.img = img
         self.feature_points_vec = []
@@ -74,16 +74,18 @@ class Frame:
         criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 100, 0.001)
         corners = cv.cornerSubPix(gray, np.float32(centroids), (5, 5), (-1, -1), criteria)
 
+        # save the points in feature_points_vec of Frame
         for k in range(corners.shape[0]):
             point = Point(corners[k, 0], corners[k, 1])
             self.feature_points_vec.append(point)
 
 
 class SourceFrame(Frame):
-
+    # SourchFrame class: create list of Frames, calculate for each frame the features by harris detector and calculate
+    #  list of trajectores
     def __init__(self, src_img, dst_img_vec):
-        super().__init__(0, src_img, src_img)
-        self.frame_vec = [Frame(k, pic, np.copy(src_img)) for k, pic in enumerate(dst_img_vec)]
+        super().__init__(0, src_img)
+        self.frame_vec = [Frame(k, pic) for k, pic in enumerate(dst_img_vec)]
         self.frame_num = len(self.frame_vec)
         self.coupled_points = {k: [] for k in range(self.frame_num)}
         self.affine_mat = {k: np.empty((2, 3)) for k in range(self.frame_num)}
@@ -98,10 +100,13 @@ class SourceFrame(Frame):
     def calcAffineTrans(coupled_points_list, selected_idx_vec):
         reference_pts = np.zeros((3, 2), dtype=np.float32)
         shifted_pts = np.zeros((3, 2), dtype=np.float32)
+
+        # run through the selected idx, build two array of the reference and the shifted points
         for k, selected_idx in enumerate(selected_idx_vec):
             reference_pts[k, :] = coupled_points_list[selected_idx].src_point
             shifted_pts[k, :] = coupled_points_list[selected_idx].dst_point
 
+        # calc the affine and inverse affine matrix between the two points
         M = cv.getAffineTransform(reference_pts, shifted_pts)
         iM = np.zeros(M.shape)
         cv.invertAffineTransform(M, iM)
@@ -109,6 +114,7 @@ class SourceFrame(Frame):
 
     @staticmethod
     def SearchFeaturePoints(src_point, L, dst_point_vec):
+        # find all points from dst_point_vec that fit inside  L sized window around the src_point
         points_in_range = []
         for potential_point in dst_point_vec:
             x_dist = abs(potential_point.x - src_point.x)
@@ -119,35 +125,48 @@ class SourceFrame(Frame):
         return points_in_range
 
     def FindBestPoint(self, src_point, dst_frame, potential_point_vec, window_size):
+        # find the best coupled point for the source point, from list of potential points in the dst frame
         src_window = self.GetWindow(src_point, window_size)
 
         ssd_vec = []
+        # for each of the points in the dst frame, calc ssd in window defined by window_size
         for dst_point in potential_point_vec:
             try:
                 ssd_vec.append(self.CalculateSSD(src_window, dst_frame.GetWindow(dst_point, window_size)))
+            # if the dst point is to close to the edge, GetWindow raise and we cannot calculate ssd -> remove this point
             except FrameError:
                 dst_frame.feature_points_vec.remove(dst_point)
                 continue
         try:
             return potential_point_vec[np.argmin([ssd_vec])]
+        # if no dst point were able to calculate ssd -> raise SourceFrameError
         except ValueError:
             raise SourceFrameError
 
     def AutomaticMatch(self, dst_frame_idx, L, W):
         dst_frame = self.frame_vec[dst_frame_idx]
 
+        # for each  point in the source features vec, search for all the points of the dst frame, inside the
+        # specified window (L)
         for k, src_point in enumerate(self.feature_points_vec):
             try:
+                # search for the relevant points
                 points_in_range = self.SearchFeaturePoints(src_point, L, dst_frame.feature_points_vec)
+
+                # if number of points is 0, skip this source point
                 if len(points_in_range) == 0:
                     continue
 
+                # if number of points is 1, it is the coupled point for this source point
                 if len(points_in_range) == 1:
                     best_point = points_in_range[0]
                 else:
+                    # there is more than one points in the L-window: choose the best by ssd
                     best_point = self.FindBestPoint(src_point, dst_frame, points_in_range, W)
 
                 self.AddCoupledPoints(dst_frame_idx, src_point, best_point)
+
+            # if noe of the points_in_range were able to calculate ssd -> remove the source point
             except SourceFrameError:
                 self.feature_points_vec.remove(src_point)
                 continue
@@ -157,6 +176,7 @@ class SourceFrame(Frame):
         self.coupled_points[dst_frame_idx].append(coupled_points)
 
     def runRANSACForFrame(self, dst_frame_idx):
+        # extract the coupled point and run RANSAC, save the transformation matrixes
         coupled_points_list = self.coupled_points[dst_frame_idx]
         best_M, best_iM = self.RANSAC(coupled_points_list)
 
@@ -168,16 +188,22 @@ class SourceFrame(Frame):
         best_M = np.empty((2, 3))
         best_iM = np.empty((2, 3))
         for _ in range(iter_num):
+            # choose 3 coupled points from list and calculate the affine matrix for them
             rand_pts_idx = permutation(len(coupled_points_list))[:3]
             M, iM = self.calcAffineTrans(coupled_points_list, rand_pts_idx)
 
+            # apply the affine transformation on all feature points in the source frame
             src_points_vec = [couple.src_point for couple in coupled_points_list]
             dst_points_vec = [couple.dst_point for couple in coupled_points_list]
             source_trans = [self.applyAffineTransPerPoint(source_point, M) for source_point in src_points_vec]
+
+            # calculate the distance between the transferred source points to the coupled dst point, and choose the
+            # points with distance blow thresh
             points_dist = calcEuclideanDist(source_trans, dst_points_vec)
             inlier_idx = np.where(points_dist < thresh)[0]
             inlier_group = [src_points_vec[idx] for idx in inlier_idx]
 
+            # update the biggest inlier group until now
             if len(inlier_group) > len(biggest_inlier):
                 biggest_inlier = inlier_group
                 best_M = M
@@ -188,6 +214,8 @@ class SourceFrame(Frame):
     def applyAffineTransForAllFrames(self):
         rows, cols, _ = self.img.shape
         affine_imgs = []
+
+        # apply the affine transformation (saved in self.affine_mat) for each of the frames in frame_list
         for k, frame in enumerate(self.frame_vec):
             affine_imgs.append(cv.warpAffine(frame.img, self.affine_mat[k], (cols, rows)))
 
@@ -197,6 +225,8 @@ class SourceFrame(Frame):
         rows, cols, ch = self.img.shape
         frame_list_real = range(self.frame_num) if frame_list is None else frame_list
         inv_affine_imgs = []
+
+        # apply the inverse affine transformation (saved in self.affine_inv_mat) for each of the frames in frame_list
         for k in frame_list_real:
             inv_affine_imgs.append(cv.warpAffine(self.frame_vec[k].img, self.affine_inv_mat[k], (cols, rows)))
 
@@ -214,30 +244,44 @@ class SourceFrame(Frame):
 
         return traj_mat
 
+    @staticmethod
+    def calcStabMat(mat, k, r):
+        # calc SVD of the mat, tak just r relevant rows/cols
+        u, s, vh = np.linalg.svd(mat)
+        u = u[:, :r]
+        s = s[:r]
+        vh = vh[:r, :]
+
+        # create the matrixes that make up 'mat'
+        c = u @ np.diag(np.sqrt(s))
+        e = np.diag(np.sqrt(s)) @ vh
+
+        # smooth rows of e by gaussian filter - corresponding to smooth the trajectories
+        sigma = k / (np.sqrt(2))
+        e_stab = ndimage.gaussian_filter(e, (0, sigma))
+
+        # assemble the stabilized new mat
+        new_mat = c @ e_stab
+        return new_mat
+
     def smartStabilization(self, k, delta, r):
+
+        # from trajectory list (saved in SourceFrame class), bulid M matrix and break it into kxk matrixes.
         trajectory = self.CreateTrajectoryMat()
         broken_mat_list = breakTrajMat(trajectory, k, delta)
         affine_mat_dict = {}
 
+        # for each mat, calc the stabilized mat (smooth the trajectories) and find the best affine transformation
+        # (using RANSAC)
         for mat_num, mat in enumerate(broken_mat_list):
-            u, s, vh = np.linalg.svd(mat)
+            new_mat = self.calcStabMat(mat, k, r)
 
-            u = u[:, :r]
-            s = s[:r]
-            vh = vh[:r, :]
-
-            c = u @ np.diag(np.sqrt(s))
-            e = np.diag(np.sqrt(s)) @ vh
-
-            sigma = k / (np.sqrt(2))
-            # sigma = 35
-            e_stab = ndimage.gaussian_filter(e, (0, sigma))
-
+            # choose which frames (column of the mat) to calc this iteration
             max_window = delta if mat_num < len(broken_mat_list) - 1 else k
-            new_mat = c @ e_stab
             x_mat, y_mat = ExtractCoorFromM(mat[:, :max_window])
             x_new_mat, y_new_mat = ExtractCoorFromM(new_mat[:, :max_window])
 
+            # run RANSAC for each of the frames
             for column_idx, (x_column, y_column, new_x_column, new_y_column) in \
                     enumerate(zip(x_mat.T, y_mat.T, x_new_mat.T, y_new_mat.T)):
                 coupled_points = []
@@ -289,7 +333,7 @@ def plotRconstImg(input_img, output, real, idx):
 
 
 def calcEuclideanDist(estimated_points_list, real_points_list):
-    dist_list = [np.linalg.norm(estimated_point - real_point) for estimated_point, real_point in
+    dist_list = [np.linalg.norm(estimated_point - real_point, ord=2) for estimated_point, real_point in
                  zip(estimated_points_list, real_points_list)]
     return np.asarray(dist_list)
 
@@ -312,19 +356,21 @@ def breakTrajMat(traj_mat, k, delta):
 
 
 def section2(data_set):
+    # for each frame, color the area around each point detected by harris
     for frame in data_set.frame_vec[::20]:
         img_with_harris = np.copy(frame.img)
         for point in frame.feature_points_vec:
             color = np.random.randint(0, 255, (1, 3))
             frame.ZeroPixelsInWindow(point, 5, img_with_harris, color)
 
+        # plot the result
         plt.figure()
         plt.imshow(img_with_harris)
         plt.title('Frame #' + str(frame.idx) + ' Corners Detected using Harris')
         plt.show()
 
 
-def Manual(data_set):
+def getPointsForManualMatching():
     ref_point_list = [Point(171, 32), Point(484, 53), Point(194, 170)]
     dst_point_dict = {20: [Point(169, 52), Point(480, 65), Point(194, 184)],
                       40: [Point(205, 78), Point(513, 79), Point(233, 205)],
@@ -333,21 +379,31 @@ def Manual(data_set):
                       100: [Point(219, 25), Point(517, 38), Point(241, 153)],
                       120: [Point(190, 74), Point(491, 84), Point(217, 202)],
                       }
+    return ref_point_list, dst_point_dict
 
+
+def Manual(data_set):
+    # define the 3 coupled point from source - the reference image to dst - each of the frames
+    ref_point_list, dst_point_dict = getPointsForManualMatching()
+
+    # for each of the frames, create list of CoupledPoints from the pair of points above
     for frame_idx in dst_point_dict.keys():
         dst_point_list = dst_point_dict[frame_idx]
         coupled_points = [CoupledPoints(ref_point, dst_point) for ref_point, dst_point
                           in zip(ref_point_list, dst_point_list)]
 
+        # calculate the affine transformation between he coupled points
         M, iM = data_set.calcAffineTrans(coupled_points, [0, 1, 2])
-
         data_set.affine_inv_mat[frame_idx] = iM
 
-    output = data_set.applyInvAffineTransForAllFrames([0, 20, 40, 60, 80, 100, 120])
+    # apply the inverse transformation on the relevant frames
+    output = data_set.applyInvAffineTransForAllFrames(dst_point_dict.keys())
 
-    for i in range(0, data_set.frame_num, 20):
-        plotRconstImg(data_set.frame_vec[i].img, output[i], data_set.img, i)
+    # plot the result
+    for i, frame_idx in enumerate(dst_point_dict.keys()):
+        plotRconstImg(data_set.frame_vec[frame_idx].img, output[i], data_set.img, frame_idx)
 
+    # create video from the result (video is short, so we take 2 fps)
     createVideoFromList(output, 'manual_stabilized.avi', 2)
 
 
@@ -378,6 +434,7 @@ def section7(data_set):
 
 
 def section8(data_set):
+    # apply the inverse affine transformation for all frames, plot the result and create video o the stabilized video
     inv_affine_imgs = data_set.applyInvAffineTransForAllFrames()
 
     for i in range(0, 121, 20):
@@ -388,19 +445,28 @@ def section8(data_set):
 
 
 def section9(data_set):
+    # calc thesmart stabilizatio by the article, apply the affine transformation for all frames and create video of
+    # the stabilized video
     data_set.smartStabilization(50, 1, 9)
     tmp = data_set.applyAffineTransForAllFrames()
     createVideoFromList(tmp, 'smart_stabilized_vid.avi', 30)
 
 
 if __name__ == '__main__':
-    # extract the images fro video to frames
-    # extractImages('inv.mp4', 'extractedImgs')
+    # create the directory to store frames if it doesn't exists
+    directory_name = 'extractedImgs'
+    # if not os.path.exists(directory_name):
+    #     os.makedirs(directory_name)
+    # extract the images from video to frames
+    # extractImages('inv.mp4', directory_name)
 
-    # create data-set
-    frames_num = list(range(361))
-    frames_names = ['extractedImgs/frame' + "%03d" % num + '.jpg' for num in frames_num]
+    # read the relevant frames
+    frames_num = list(range(151))
+    frames_names = [directory_name + '/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im)[:, :, ::-1] for im in frames_names]
+
+    # create the data base: SourceFrame class, which have the reference image and list of the Frames class
+    # constructor of Frame calculate the points of harris corner detector
     source_frame = SourceFrame(frames[0], frames[1:])
 
     Manual(source_frame)
