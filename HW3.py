@@ -455,13 +455,13 @@ def section9(data_set):
 if __name__ == '__main__':
     # create the directory to store frames if it doesn't exists
     directory_name = 'extractedImgs'
-    # if not os.path.exists(directory_name):
-    #     os.makedirs(directory_name)
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
     # extract the images from video to frames
-    # extractImages('inv.mp4', directory_name)
+    extractImages('inv.mp4', directory_name)
 
     # read the relevant frames
-    frames_num = list(range(151))
+    frames_num = list(range(361))
     frames_names = [directory_name + '/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im)[:, :, ::-1] for im in frames_names]
 
