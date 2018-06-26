@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 from numpy.random import permutation
 from Q3 import *
 from klt import *
-from sklearn.utils.extmath import randomized_svd as svd_t
-# from scipy.signal import savgol_filter
 from scipy import ndimage
+from GrabCut import *
+import colorsys
 
 CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 
@@ -12,8 +12,9 @@ CoupledPoints = namedtuple('CoupledPoints', ['src_point', 'dst_point'])
 class Frame:
     # Frame class, calculate the feature_points_vec by cornerDetector()
     def __init__(self, idx, img):
+        print('Creating frame' + str(idx))
         self.idx = idx
-        self.img = img
+        self.img, self.mask = SegmentImage(img)
         self.feature_points_vec = []
         self.cornerDetector()
 
@@ -83,8 +84,9 @@ class Frame:
 class SourceFrame(Frame):
     # SourchFrame class: create list of Frames, calculate for each frame the features by harris detector and calculate
     #  list of trajectores
-    def __init__(self, src_img, dst_img_vec):
+    def __init__(self, src_img, dst_img_vec, bgs):
         super().__init__(0, src_img)
+        self.bgs = bgs
         self.frame_vec = [Frame(k, pic) for k, pic in enumerate(dst_img_vec)]
         self.frame_num = len(self.frame_vec)
         self.coupled_points = {k: [] for k in range(self.frame_num)}
@@ -214,12 +216,14 @@ class SourceFrame(Frame):
     def applyAffineTransForAllFrames(self):
         rows, cols, _ = self.img.shape
         affine_imgs = []
+        affine_masks = []
 
         # apply the affine transformation (saved in self.affine_mat) for each of the frames in frame_list
         for k, frame in enumerate(self.frame_vec):
             affine_imgs.append(cv.warpAffine(frame.img, self.affine_mat[k], (cols, rows)))
+            affine_masks.append(cv.warpAffine(frame.mask, self.affine_mat[k], (cols, rows)))
 
-        return affine_imgs
+        return affine_imgs, affine_masks
 
     def applyInvAffineTransForAllFrames(self, frame_list=None):
         rows, cols, ch = self.img.shape
@@ -257,7 +261,9 @@ class SourceFrame(Frame):
         e = np.diag(np.sqrt(s)) @ vh
 
         # smooth rows of e by gaussian filter - corresponding to smooth the trajectories
-        sigma = k / (np.sqrt(2))
+        # sigma = 200
+        sigma = 100
+        # sigma = k / (np.sqrt(2))
         e_stab = ndimage.gaussian_filter(e, (0, sigma))
 
         # assemble the stabilized new mat
@@ -290,7 +296,7 @@ class SourceFrame(Frame):
                     smoothed_point = Point(new_x_column[j], new_y_column[j])
                     coupled_points.append(CoupledPoints(original_point, smoothed_point))
 
-                affine_mat, _ = self.RANSAC(coupled_points, 100, 0.5)
+                affine_mat, _ = self.RANSAC(coupled_points, 100, 0.1)
 
                 frame_idx = mat_num * delta + column_idx
                 affine_mat_dict[frame_idx] = affine_mat
@@ -325,11 +331,12 @@ def initChosenFeatures(corners):
 
 
 def plotRconstImg(input_img, output, real, idx):
-    plt.figure()
-    plt.subplot(131), plt.imshow(input_img), plt.title('frame #' + str(idx))
-    plt.subplot(132), plt.imshow(output), plt.title('trans frame')
-    plt.subplot(133), plt.imshow(real), plt.title('reference')
-    plt.show()
+    pass
+    # plt.figure()
+    # plt.subplot(131), plt.imshow(input_img), plt.title('frame #' + str(idx))
+    # plt.subplot(132), plt.imshow(output), plt.title('trans frame')
+    # plt.subplot(133), plt.imshow(real), plt.title('reference')
+    # #plt.show()
 
 
 def calcEuclideanDist(estimated_points_list, real_points_list):
@@ -358,16 +365,16 @@ def breakTrajMat(traj_mat, k, delta):
 def section2(data_set):
     # for each frame, color the area around each point detected by harris
     for frame in data_set.frame_vec[::20]:
-        img_with_harris = np.copy(frame.img)
+        img_with_harris = frame.img  #np.copy(frame.img)
         for point in frame.feature_points_vec:
             color = np.random.randint(0, 255, (1, 3))
             frame.ZeroPixelsInWindow(point, 5, img_with_harris, color)
 
         # plot the result
-        plt.figure()
-        plt.imshow(img_with_harris)
-        plt.title('Frame #' + str(frame.idx) + ' Corners Detected using Harris')
-        plt.show()
+        # plt.figure()
+        # plt.imshow(img_with_harris)
+        # plt.title('Frame #' + str(frame.idx) + ' Corners Detected using Harris')
+        # plt.show()
 
 
 def getPointsForManualMatching():
@@ -413,18 +420,19 @@ def section6(data_set):
         source_frame.AutomaticMatch(frame.idx, 100, 50)
 
     # plot the pair images of the reference image and each of the frames with relevant matched points
-        dst_img_disp = np.copy(frame.img)
-        ref_img_disp = np.copy(data_set.img)
+        dst_img_disp = frame.img  #np.copy(frame.img)
+        ref_img_disp = frame.img  #np.copy(frame.img)
         for coupled_points in data_set.coupled_points[frame.idx][:10]:
             color = np.random.randint(0, 255, (1, 3))
             data_set.ZeroPixelsInWindow(coupled_points.src_point, 5, ref_img_disp, color)
             data_set.ZeroPixelsInWindow(coupled_points.dst_point, 5, dst_img_disp, color)
 
         if frame.idx in list(range(0, 121, 20)):
-            plt.figure()
-            plt.subplot(121), plt.imshow(ref_img_disp), plt.title('Automatic matched points - reference image')
-            plt.subplot(122), plt.imshow(dst_img_disp), plt.title('Frame #' + str(frame.idx))
-            plt.show()
+            pass
+            # plt.figure()
+            # plt.subplot(121), plt.imshow(ref_img_disp), plt.title('Automatic matched points - reference image')
+            # plt.subplot(122), plt.imshow(dst_img_disp), plt.title('Frame #' + str(frame.idx))
+            # #plt.show()
 
 
 def section7(data_set):
@@ -447,9 +455,21 @@ def section8(data_set):
 def section9(data_set):
     # calc thesmart stabilizatio by the article, apply the affine transformation for all frames and create video of
     # the stabilized video
-    data_set.smartStabilization(50, 1, 9)
-    tmp = data_set.applyAffineTransForAllFrames()
-    createVideoFromList(tmp, 'smart_stabilized_vid.avi', 30)
+    print('Start')
+    data_set.smartStabilization(50, 5, 20)
+    print('Stabilized Video :)')
+    image_list, mask_list = data_set.applyAffineTransForAllFrames()
+    final_image_list = []
+    for k, (image, mask) in enumerate(zip(image_list, mask_list)):
+        bg = image * (mask)
+        hsv = cv2.cvtColor(bg, cv2.COLOR_BGR2HSV)
+        hsv[:,:,0] = (10 * k) % 256
+        hsv[:,:,1] *= 2
+        bg = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+
+        final_image_list.append(bg + data_set.bgs[k] * (1 - mask))
+
+    createVideoFromList(final_image_list, 'smart_stabilized_vid.avi', 30)
 
 
 if __name__ == '__main__':
@@ -458,23 +478,36 @@ if __name__ == '__main__':
     if not os.path.exists(directory_name):
         os.makedirs(directory_name)
     # extract the images from video to frames
-    extractImages('inv.mp4', directory_name)
+    extractImages('guitar.mp4', directory_name)
 
+    directory_bg_name = 'extractedBg'
+    # if not os.path.exists(directory_bg_name):
+    #     os.makedirs(directory_bg_name)
+    # extract the images from video to frames
+    # extractImages('beach background.mp4', directory_bg_name)
+
+    f = 156
     # read the relevant frames
-    frames_num = list(range(361))
+    frames_num = list(range(f))
     frames_names = [directory_name + '/frame' + "%03d" % num + '.jpg' for num in frames_num]
     frames = [cv.imread(im)[:, :, ::-1] for im in frames_names]
 
+    height, width = frames[0].shape[:2]
+
+    bg_num = list(range(f))
+    bg_names = [directory_bg_name + '/frame' + "%03d" % num + '.jpg' for num in bg_num]
+    bgs = [cv.resize(cv.imread(im), (width, height), interpolation=cv.INTER_CUBIC)[:, :, ::-1] for im in bg_names]
+
     # create the data base: SourceFrame class, which have the reference image and list of the Frames class
     # constructor of Frame calculate the points of harris corner detector
-    source_frame = SourceFrame(frames[0], frames[1:])
+    source_frame = SourceFrame(frames[0], frames[1:], bgs)
 
-    Manual(source_frame)
+    # Manual(source_frame)
 
-    section2(source_frame)
-    section6(source_frame)
-    section7(source_frame)
-    section8(source_frame)
+    # section2(source_frame)
+    # section6(source_frame)
+    # section7(source_frame)
+    # section8(source_frame)
     section9(source_frame)
 
     print('all done')
